@@ -216,10 +216,7 @@
 
         <label>消費日期</label>
         <input type="date" id="expenseDate" onchange="hideAnalysis()">
-
-        <label>備註</label>
-        <input type="text" id="expenseNote" placeholder="例如：同行者、店名、用途" oninput="hideAnalysis()">
-
+        
         <label>金額輸入方式</label>
         <select id="expenseAmountMode" onchange="setExpenseAmountMode(this.value)">
             <option value="jpy">日幣 + 匯率</option>
@@ -242,6 +239,9 @@
                 </div>
             </div>
         </div>
+
+		<label>備註</label>
+        <input type="text" id="expenseNote" placeholder="例如：同行者、店名、用途" oninput="hideAnalysis()">
 
         <button class="btn-calc" id="mainBtn" onclick="calculate()" style="background-color: #f58559; ">分析此筆交易</button>
 
