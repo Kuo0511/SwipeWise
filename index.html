@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swipe Wise Firebase 共用帳本版</title>
+    <title>Swipe Wise Firebase 共用帳本版 - 浮動登入</title>
     <style>
         :root {
             --primary: #d32f2f;
@@ -67,32 +67,57 @@
         .tag { font-size: 0.65em; padding: 2px 4px; border-radius: 3px; font-weight: bold; }
         .tag-card { background: #e8f5e9; color: #2e7d32; }
         .tag-cash { background: #fffde7; color: #a67c00; }
+
+
+        /* 登入 / 帳本浮動面板：不佔用主要記帳區域 */
+        .floating-auth { position: fixed; top: 14px; right: 14px; z-index: 1000; width: min(330px, calc(100vw - 28px)); }
+        .auth-toggle { width: auto; float: right; padding: 10px 14px; border-radius: 999px; background: #333; color: white; font-size: 0.85em; box-shadow: 0 4px 14px rgba(0,0,0,0.18); }
+        .auth-panel { clear: both; margin-top: 48px; background: rgba(255,255,255,0.98); border: 1px solid #eee; border-radius: 16px; padding: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.18); display: none; backdrop-filter: blur(8px); }
+        .auth-panel.open { display: block; }
+        .auth-panel .card { margin-bottom: 10px; padding: 12px; }
+        .auth-panel button { padding: 11px; font-size: 0.92em; }
+        .auth-panel input { padding: 10px; font-size: 0.92em; }
+        .auth-close { background: none; color: #777; padding: 6px 0 0 0; font-size: 0.8em; }
+        .status-pill { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #f1f3f4; color: #555; font-size: 0.75em; margin-top: 6px; }
+        @media (max-width: 600px) {
+            body { padding-top: 58px; }
+            .floating-auth { top: 8px; right: 8px; left: 8px; width: auto; }
+            .auth-toggle { float: right; padding: 9px 12px; }
+            .auth-panel { margin-top: 44px; max-height: 78vh; overflow: auto; }
+        }
     </style>
 </head>
 <body>
+
+<div class="floating-auth">
+    <button class="auth-toggle" onclick="toggleAuthPanel()">👤 登入 / 帳本</button>
+    <div class="auth-panel" id="authPanel">
+        <div class="card" id="authCard">
+            <div id="userInfo" style="font-size:0.9em; margin-bottom:8px; color:#555;">尚未登入</div>
+            <div id="loginStatus" class="status-pill">未連線</div>
+            <button id="loginBtn" onclick="loginWithGoogle()" style="background:#4285f4; color:white; margin-top:10px;">使用 Google 登入</button>
+            <button id="logoutBtn" onclick="logout()" style="display:none; background:#777; color:white; margin-top:10px;">登出</button>
+        </div>
+
+        <div class="card" id="bookBox" style="display:none;">
+            <label>建立新帳本</label>
+            <input type="text" id="bookName" placeholder="例如：東京旅遊記帳">
+            <button onclick="createBook()" style="background:#673ab7; color:white; margin-bottom:10px;">建立共用帳本</button>
+
+            <label>加入朋友的帳本</label>
+            <input type="text" id="joinBookId" placeholder="輸入朋友給你的 bookId">
+            <button onclick="joinBook()" style="background:#2e7d32; color:white;">加入帳本</button>
+
+            <div id="currentBookInfo" style="margin-top:10px; font-size:0.82em; color:#555; white-space:pre-wrap; word-break:break-all;"></div>
+        </div>
+        <button class="auth-close" onclick="toggleAuthPanel(false)">收起面板</button>
+    </div>
+</div>
 
 <div class="container">
     <h2 style="color: #333;">Swipe Wise</h2>
     
     <div class="cash-info">現金匯率：<strong>0.19882</strong> | 6% 額度：<strong>$25,000</strong></div>
-
-    <div class="card" id="authCard">
-        <div id="userInfo" style="font-size:0.9em; margin-bottom:10px; color:#555;">尚未登入</div>
-        <button id="loginBtn" onclick="loginWithGoogle()" style="background:#4285f4; color:white;">使用 Google 登入</button>
-        <button id="logoutBtn" onclick="logout()" style="display:none; background:#777; color:white;">登出</button>
-    </div>
-
-    <div class="card" id="bookBox" style="display:none;">
-        <label>建立新帳本</label>
-        <input type="text" id="bookName" placeholder="例如：東京旅遊記帳">
-        <button onclick="createBook()" style="background:#673ab7; color:white; margin-bottom:10px;">建立共用帳本</button>
-
-        <label>加入朋友的帳本</label>
-        <input type="text" id="joinBookId" placeholder="輸入朋友給你的 bookId">
-        <button onclick="joinBook()" style="background:#2e7d32; color:white;">加入帳本</button>
-
-        <div id="currentBookInfo" style="margin-top:10px; font-size:0.85em; color:#555; white-space:pre-wrap;"></div>
-    </div>
 
     <div class="card" style="background: #f8f9fa;">
         <label>支付方式</label>
@@ -208,6 +233,16 @@
     document.getElementById('cardRate').value = localStorage.getItem('jp_last_rate') || 0.19882;
     recalculateAndUI();
 
+
+    window.toggleAuthPanel = function (forceOpen) {
+        const panel = document.getElementById('authPanel');
+        if (typeof forceOpen === 'boolean') {
+            panel.classList.toggle('open', forceOpen);
+        } else {
+            panel.classList.toggle('open');
+        }
+    };
+
     window.loginWithGoogle = async function () {
         try {
             const provider = new GoogleAuthProvider();
@@ -235,9 +270,11 @@
         const logoutBtn = document.getElementById('logoutBtn');
         const bookBox = document.getElementById('bookBox');
         const currentBookInfo = document.getElementById('currentBookInfo');
+        const loginStatus = document.getElementById('loginStatus');
 
         if (user) {
             userInfo.innerText = `目前登入：${user.email}`;
+            loginStatus.innerText = currentBookId ? '已連線帳本' : '已登入，尚未選擇帳本';
             loginBtn.style.display = 'none';
             logoutBtn.style.display = 'block';
             bookBox.style.display = 'block';
@@ -248,6 +285,7 @@
             }
         } else {
             userInfo.innerText = '尚未登入';
+            loginStatus.innerText = '未連線';
             loginBtn.style.display = 'block';
             logoutBtn.style.display = 'none';
             bookBox.style.display = 'none';
@@ -293,6 +331,7 @@
 
             document.getElementById('currentBookInfo').innerText =
                 `目前帳本：${name}\n帳本 ID：${currentBookId}\n\n請把這個帳本 ID 給朋友，朋友登入後輸入即可加入。`;
+            document.getElementById('loginStatus').innerText = '已連線帳本';
 
             listenRecords(currentBookId);
         } catch (error) {
@@ -325,6 +364,7 @@
 
             document.getElementById('currentBookInfo').innerText =
                 `已加入帳本\n帳本 ID：${currentBookId}`;
+            document.getElementById('loginStatus').innerText = '已連線帳本';
 
             listenRecords(currentBookId);
         } catch (error) {
