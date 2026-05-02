@@ -210,18 +210,27 @@
     <div class="card">
         <label>消費品項</label>
         <input type="text" id="itemName" placeholder="例如：藥妝、壽司" oninput="hideAnalysis()">
-        <label>商品金額 (JPY)</label>
+
+        <label>金額輸入方式</label>
+        <select id="expenseAmountMode" onchange="setExpenseAmountMode(this.value)">
+            <option value="jpy">日幣 + 匯率</option>
+            <option value="twd">只輸入台幣</option>
+        </select>
+
+        <label id="amountLabel">商品金額 (JPY)</label>
         <input type="number" id="jpyPrice" placeholder="0" oninput="hideAnalysis()">
 
         <div id="cardFields">
-            <label>刷卡匯率 (或從助手推算)</label>
-            <div style="display:flex; gap:5px; margin-bottom:10px;">
-                <input type="number" id="cardRate" step="0.00001" style="margin-bottom:0;" oninput="hideAnalysis()">
-                <button onclick="autoCalcRate()" style="width: auto; padding: 0 15px; background: #ffbece; color: rgb(114, 60, 60); font-size: 0.8em; white-space: nowrap; display: flex; align-items: center; justify-content: center;">匯率助手</button>    
-            </div>
-            <div id="helperBox" style="display:none; padding:10px; background:#f3e5f5; border-radius:8px; margin-bottom:10px;">
-                <label style="color:var(--accent)">匯率助手：輸入台幣</label>
-                <input type="number" id="helperTwd" placeholder="台幣金額" oninput="autoCalcRate()">
+            <div id="cardRateBox">
+                <label>刷卡匯率 (或從助手推算)</label>
+                <div style="display:flex; gap:5px; margin-bottom:10px;">
+                    <input type="number" id="cardRate" step="0.00001" style="margin-bottom:0;" oninput="hideAnalysis()">
+                    <button onclick="autoCalcRate()" style="width: auto; padding: 0 15px; background: #ffbece; color: rgb(114, 60, 60); font-size: 0.8em; white-space: nowrap; display: flex; align-items: center; justify-content: center;">匯率助手</button>    
+                </div>
+                <div id="helperBox" style="display:none; padding:10px; background:#f3e5f5; border-radius:8px; margin-bottom:10px;">
+                    <label style="color:var(--accent)">匯率助手：輸入台幣</label>
+                    <input type="number" id="helperTwd" placeholder="台幣金額" oninput="autoCalcRate()">
+                </div>
             </div>
         </div>
 
@@ -377,6 +386,7 @@
     let currentRewardPlanKey = localStorage.getItem('swipe_reward_plan') || 'sixThenTwo';
 
     let currentInputType = 'card';
+    let currentExpenseAmountMode = 'jpy';
     let currentView = 'all';
     let editingId = null;
     let tempCalc = null;
@@ -393,6 +403,7 @@
     document.getElementById('cardRate').value = localStorage.getItem('jp_last_rate') || currentCashRate.toFixed(5);
     document.getElementById('exchangeDate').value = new Date().toISOString().slice(0, 10);
     updateRewardPlanUI();
+    updateExpenseAmountModeUI();
     recalculateAndUI();
 
 
@@ -444,6 +455,12 @@
         }, { merge: true });
     }
 
+    function updateCurrentBookInfo(name, bookId) {
+        const label = name ? `目前帳本：${name}` : '目前帳本';
+        document.getElementById('currentBookInfo').innerText = `${label}\n帳本 ID：${bookId}`;
+        document.getElementById('loginStatus').innerText = '已連線帳本';
+    }
+
     function getCurrentRewardPlan() {
         return REWARD_PLANS[currentRewardPlanKey] || REWARD_PLANS.sixThenTwo;
     }
@@ -478,7 +495,12 @@
             cashInfo.innerHTML = `現金匯率：<strong>${cashRateLabel}</strong> | 回饋方案：<strong>${plan.label}</strong>`;
         }
 
-       
+        const hint = document.getElementById('rewardPlanHint');
+        if (hint) {
+            hint.innerText = currentBookId
+                ? '目前選擇只會套用在新增或編輯當下這筆刷卡資料；歷史紀錄會保留原本方案。'
+                : '回饋方案只會套用在新增或編輯當下這筆刷卡資料。';
+        }
     }
 
     async function persistRewardPlanToBook() {
@@ -581,6 +603,7 @@
         editingId = null;
         tempCalc = null;
         resetForm();
+        updateCurrentBookInfo(bookName, currentBookId);
         listenBookSettings(currentBookId);
         listenRecords(currentBookId);
         listenExchangeRecords(currentBookId);
@@ -782,10 +805,33 @@
         });
     }
 
+    function updateExpenseAmountModeUI() {
+        const mode = document.getElementById('expenseAmountMode')?.value || 'jpy';
+        currentExpenseAmountMode = mode;
+        const amountLabel = document.getElementById('amountLabel');
+        const amountInput = document.getElementById('jpyPrice');
+        const cardRateBox = document.getElementById('cardRateBox');
+        const helperBox = document.getElementById('helperBox');
+
+        if (amountLabel) amountLabel.innerText = mode === 'twd' ? '商品金額 (TWD)' : '商品金額 (JPY)';
+        if (amountInput) amountInput.placeholder = mode === 'twd' ? '例如：1988' : '0';
+        if (cardRateBox) cardRateBox.style.display = (currentInputType === 'card' && mode === 'jpy') ? 'block' : 'none';
+        if (helperBox && mode === 'twd') helperBox.style.display = 'none';
+    }
+
+    window.setExpenseAmountMode = function (mode) {
+        currentExpenseAmountMode = mode || 'jpy';
+        const selector = document.getElementById('expenseAmountMode');
+        if (selector) selector.value = currentExpenseAmountMode;
+        updateExpenseAmountModeUI();
+        hideAnalysis();
+    };
+
     window.setType = function (type) {
         currentInputType = type;
         document.querySelectorAll('.type-btn[data-type]').forEach(btn => btn.classList.toggle('active', btn.dataset.type === type));
         document.getElementById('cardFields').style.display = type === 'card' ? 'block' : 'none';
+        updateExpenseAmountModeUI();
         hideAnalysis();
     };
 
@@ -796,6 +842,10 @@
     };
 
     window.autoCalcRate = function () {
+        if ((document.getElementById('expenseAmountMode')?.value || 'jpy') === 'twd') {
+            alert('只輸入台幣模式不需要匯率助手');
+            return;
+        }
         const jpy = parseFloat(document.getElementById('jpyPrice').value);
         const twd = parseFloat(document.getElementById('helperTwd').value);
         const hBox = document.getElementById('helperBox');
@@ -850,25 +900,54 @@
         };
     }
 
+    function getRecordAmountMode(r) {
+        return r.amountMode || (Number(r.twdAmount) > 0 ? 'twd' : 'jpy');
+    }
+
+    function getRecordBaseTwd(r) {
+        if (getRecordAmountMode(r) === 'twd') return Number(r.twdAmount || r.accountingTwd || 0);
+        return Number(r.jpy || 0) * Number(r.cardRate || getCashRate());
+    }
+
+    function formatRecordAmountLine(r) {
+        if (getRecordAmountMode(r) === 'twd') {
+            return `$${Math.round(getRecordBaseTwd(r)).toLocaleString()} TWD`;
+        }
+        return `¥ ${Number(r.jpy || 0).toLocaleString()} × ${r.cardRate} ➜ $${Math.round(getRecordBaseTwd(r)).toLocaleString()} TWD`;
+    }
+
     window.calculate = function () {
         const name = document.getElementById('itemName').value || (currentInputType === 'card' ? '刷卡消費' : '現金消費');
-        const jpy = parseFloat(document.getElementById('jpyPrice').value);
+        const amountMode = document.getElementById('expenseAmountMode')?.value || 'jpy';
+        const amountValue = parseFloat(document.getElementById('jpyPrice').value);
         const cardRate = currentInputType === 'card' ? parseFloat(document.getElementById('cardRate').value) : getCashRate();
 
-        if (!jpy || !cardRate) return alert('請輸入日圓金額與匯率');
+        if (!amountValue || amountValue <= 0) return alert(amountMode === 'twd' ? '請輸入台幣金額' : '請輸入日圓金額');
+        if (amountMode === 'jpy' && !cardRate) return alert('請輸入日圓金額與匯率');
 
         const analysisBox = document.getElementById('analysisBox');
         const analysisContent = document.getElementById('analysisContent');
         analysisBox.style.display = 'block';
 
         if (currentInputType === 'cash') {
-            const cashFinal = jpy * getCashRate();
-            analysisContent.innerHTML = `
-                • 品項：${name}<br>
-                • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
-                <span class="muted">此筆為現金消費，不顯示刷卡回饋與現金比較。</span>
-            `;
-            tempCalc = { name, jpy, cardRate: getCashRate(), type: currentInputType };
+            if (amountMode === 'twd') {
+                const cashFinal = amountValue;
+                analysisContent.innerHTML = `
+                    • 品項：${name}<br>
+                    • 輸入方式：只輸入台幣<br>
+                    • 現金記帳金額：$${Math.round(cashFinal).toLocaleString()} TWD <br>
+                    <span class="muted">此筆為台幣金額紀錄，不需要匯率，也不顯示刷卡回饋與現金比較。</span>
+                `;
+                tempCalc = { name, amountMode: 'twd', twdAmount: amountValue, jpy: 0, cardRate: 1, type: currentInputType };
+            } else {
+                const cashFinal = amountValue * getCashRate();
+                analysisContent.innerHTML = `
+                    • 品項：${name}<br>
+                    • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
+                    <span class="muted">此筆為現金消費，不顯示刷卡回饋與現金比較。</span>
+                `;
+                tempCalc = { name, amountMode: 'jpy', jpy: amountValue, cardRate: getCashRate(), type: currentInputType };
+            }
         } else {
             const inputRewardPlanKey = currentRewardPlanKey;
             const currentRunningBase = records.filter(r =>
@@ -876,28 +955,43 @@
                     r.type === 'card' &&
                     getRecordRewardPlanKey(r) === inputRewardPlanKey
                 )
-                .reduce((sum, r) => sum + (Number(r.jpy) * Number(r.cardRate)), 0);
-            const thisBase = jpy * cardRate;
+                .reduce((sum, r) => sum + getRecordBaseTwd(r), 0);
+
+            const thisBase = amountMode === 'twd' ? amountValue : amountValue * cardRate;
             const reward = getCardReward(thisBase, currentRunningBase, inputRewardPlanKey);
             const feeTwd = thisBase * BANK_FEE_RATE;
             const cardFinal = thisBase + feeTwd - reward.amount;
-            const cashFinal = jpy * getCashRate();
-            const saved = cashFinal - cardFinal;
 
-            analysisContent.innerHTML = `
-                • 品項：${name}<br>
-                • 回饋方案：${getRewardPlanByKey(inputRewardPlanKey).label}<br>
-                • 記帳金額（日幣 × 刷卡匯率）：$${Math.round(thisBase).toLocaleString()} TWD <br>
-                • 刷卡實際比較成本：$${Math.round(cardFinal).toLocaleString()} TWD <br>
-                • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
-                • 回饋：${reward.desc}，約 $${Math.round(reward.amount).toLocaleString()} TWD <br>
-                • 手續費：1.5%，約 $${Math.round(feeTwd).toLocaleString()} TWD <br>
-                <span class="${saved >= 0 ? 'better' : 'worse'}">
-                    ➔ ${saved >= 0 ? '刷卡比現金省約 $' + Math.round(saved).toLocaleString() : '刷卡比現金多花約 $' + Math.round(Math.abs(saved)).toLocaleString()}
-                </span>
-            `;
-            tempCalc = { name, jpy, cardRate, type: currentInputType, rewardPlanKey: inputRewardPlanKey, rewardPlanLabel: getRewardPlanByKey(inputRewardPlanKey).label };
-            localStorage.setItem('jp_last_rate', cardRate);
+            if (amountMode === 'twd') {
+                analysisContent.innerHTML = `
+                    • 品項：${name}<br>
+                    • 輸入方式：只輸入台幣<br>
+                    • 回饋方案：${getRewardPlanByKey(inputRewardPlanKey).label}<br>
+                    • 記帳金額：$${Math.round(thisBase).toLocaleString()} TWD <br>
+                    • 刷卡實際成本：$${Math.round(cardFinal).toLocaleString()} TWD <br>
+                    • 回饋：${reward.desc}，約 $${Math.round(reward.amount).toLocaleString()} TWD <br>
+                    • 手續費：1.5%，約 $${Math.round(feeTwd).toLocaleString()} TWD <br>
+                    <span class="muted">此筆沒有日幣金額，因此不計算「比現金省多少」。</span>
+                `;
+                tempCalc = { name, amountMode: 'twd', twdAmount: amountValue, jpy: 0, cardRate: 1, type: currentInputType, rewardPlanKey: inputRewardPlanKey, rewardPlanLabel: getRewardPlanByKey(inputRewardPlanKey).label };
+            } else {
+                const cashFinal = amountValue * getCashRate();
+                const saved = cashFinal - cardFinal;
+                analysisContent.innerHTML = `
+                    • 品項：${name}<br>
+                    • 回饋方案：${getRewardPlanByKey(inputRewardPlanKey).label}<br>
+                    • 記帳金額（日幣 × 刷卡匯率）：$${Math.round(thisBase).toLocaleString()} TWD <br>
+                    • 刷卡實際比較成本：$${Math.round(cardFinal).toLocaleString()} TWD <br>
+                    • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
+                    • 回饋：${reward.desc}，約 $${Math.round(reward.amount).toLocaleString()} TWD <br>
+                    • 手續費：1.5%，約 $${Math.round(feeTwd).toLocaleString()} TWD <br>
+                    <span class="${saved >= 0 ? 'better' : 'worse'}">
+                        ➔ ${saved >= 0 ? '刷卡比現金省約 $' + Math.round(saved).toLocaleString() : '刷卡比現金多花約 $' + Math.round(Math.abs(saved)).toLocaleString()}
+                    </span>
+                `;
+                tempCalc = { name, amountMode: 'jpy', jpy: amountValue, cardRate, type: currentInputType, rewardPlanKey: inputRewardPlanKey, rewardPlanLabel: getRewardPlanByKey(inputRewardPlanKey).label };
+                localStorage.setItem('jp_last_rate', cardRate);
+            }
         }
 
         const addBtn = document.getElementById('addBtn');
@@ -911,9 +1005,11 @@
         let sorted = [...records].reverse();
 
         sorted = sorted.map(r => {
-            let accountingTwdCost, finalTwdCost, feeTwd = 0, saved = 0, rewardAmount = 0, rewardDesc = '';
-            const thisBase = Number(r.jpy) * Number(r.cardRate);
+            let accountingTwdCost, finalTwdCost, feeTwd = 0, saved = null, rewardAmount = 0, rewardDesc = '';
+            const thisBase = getRecordBaseTwd(r);
+            const amountMode = getRecordAmountMode(r);
             accountingTwdCost = thisBase;
+
             if (r.type === 'card') {
                 const recordPlanKey = getRecordRewardPlanKey(r);
                 const runningBaseForPlan = runningCardBaseByPlan[recordPlanKey] || 0;
@@ -922,12 +1018,16 @@
                 rewardDesc = reward.desc;
                 feeTwd = thisBase * BANK_FEE_RATE;
                 finalTwdCost = thisBase + feeTwd - rewardAmount;
-                saved = (Number(r.jpy) * getCashRate()) - finalTwdCost;
+
+                if (amountMode === 'jpy') {
+                    saved = (Number(r.jpy) * getCashRate()) - finalTwdCost;
+                }
+
                 runningCardBaseByPlan[recordPlanKey] = runningBaseForPlan + thisBase;
                 if (recordPlanKey === currentRewardPlanKey) selectedPlanRunningBase += thisBase;
             } else {
-                finalTwdCost = Number(r.jpy) * getCashRate();
-                rewardDesc = '現金';
+                finalTwdCost = thisBase;
+                rewardDesc = amountMode === 'twd' ? '台幣現金' : '現金';
             }
             return { ...r, accountingTwdCost, finalTwdCost, feeTwd, saved, rewardAmount, rewardDesc };
         });
@@ -939,7 +1039,10 @@
         if(currentView === 'cash') filterRecords = records.filter(r => r.type === 'cash');
 
         let totalTwd = 0, totalSaved = 0;
-        filterRecords.forEach(r => { totalTwd += r.accountingTwdCost || 0; totalSaved += (r.saved || 0); });
+        filterRecords.forEach(r => {
+            totalTwd += r.accountingTwdCost || 0;
+            if (typeof r.saved === 'number') totalSaved += r.saved;
+        });
         document.getElementById('sumTotal').innerText = Math.round(totalTwd).toLocaleString();
         document.getElementById('sumSaved').innerText = Math.round(totalSaved).toLocaleString();
         document.getElementById('sumSavedBox').style.display = currentView === 'cash' ? 'none' : 'block';
@@ -969,6 +1072,8 @@
 
         filterRecords.forEach(r => {
             const isCard = r.type === 'card';
+            const amountMode = getRecordAmountMode(r);
+            const hasCashComparison = isCard && typeof r.saved === 'number';
             const div = document.createElement('div');
             div.className = `record-item ${isCard ? 'record-card' : 'record-cash'}`;
             div.innerHTML = `
@@ -977,14 +1082,16 @@
                     <div class="action-btn" style="color:var(--primary)" onclick="deleteRecord('${r.id}')">✕</div>
                 </div>
                 <div class="record-title">${r.name} <span class="tag ${isCard ? 'tag-card' : 'tag-cash'}">${isCard ? '💳 刷卡' : '💴 現金'}</span></div>
-                <div class="record-amount">¥ ${Number(r.jpy).toLocaleString()} ➜ $${Math.round(r.accountingTwdCost).toLocaleString()} TWD</div>
+                <div class="record-amount">${formatRecordAmountLine(r)}</div>
                 <div class="record-detail">
-                    匯率: ${r.cardRate}
+                    輸入方式: ${amountMode === 'twd' ? '只輸入台幣' : '日幣 + 匯率'}
+                    ${amountMode === 'jpy' ? `<br>匯率: ${r.cardRate}` : ''}
                     ${isCard ? `<br>回饋方案: ${getRewardPlanByKey(getRecordRewardPlanKey(r)).label}` : ''}
-                    ${isCard ? `<br>實際比較成本: $${Math.round(r.finalTwdCost).toLocaleString()} TWD` : ''}
+                    ${isCard ? `<br>實際成本: $${Math.round(r.finalTwdCost).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>回饋: ${r.rewardDesc}，約 $${Math.round(r.rewardAmount).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>手續費: 1.5%，約 $${Math.round(r.feeTwd).toLocaleString()} TWD` : ''}
-                    ${isCard ? `<br><span class="${r.saved >= 0 ? 'better' : 'worse'}">${r.saved >= 0 ? '比現金省約 $' + Math.round(r.saved).toLocaleString() : '比現金多花約 $' + Math.round(Math.abs(r.saved)).toLocaleString()}</span>` : ''}
+                    ${hasCashComparison ? `<br><span class="${r.saved >= 0 ? 'better' : 'worse'}">${r.saved >= 0 ? '比現金省約 $' + Math.round(r.saved).toLocaleString() : '比現金多花約 $' + Math.round(Math.abs(r.saved)).toLocaleString()}</span>` : ''}
+                    ${isCard && amountMode === 'twd' ? `<br><span class="muted">台幣輸入無日幣基準，未計算比現金省多少。</span>` : ''}
                     ${r.createdByEmail ? `<br><span class="muted">建立者：${r.createdByEmail}</span>` : ''}
                 </div>
             `;
@@ -1034,10 +1141,12 @@
         if (!r) return;
         editingId = id;
         window.setType(r.type || 'card');
+        const amountMode = getRecordAmountMode(r);
+        window.setExpenseAmountMode(amountMode);
         document.getElementById('itemName').value = r.name;
-        document.getElementById('jpyPrice').value = r.jpy;
+        document.getElementById('jpyPrice').value = amountMode === 'twd' ? (r.twdAmount || r.accountingTwdCost || r.accountingTwd || 0) : r.jpy;
         if(r.type === 'card') {
-            document.getElementById('cardRate').value = r.cardRate;
+            if (amountMode === 'jpy') document.getElementById('cardRate').value = r.cardRate;
             window.setRewardPlan(getRecordRewardPlanKey(r), { skipSave: true });
         }
         document.getElementById('mainBtn').innerText = '🔄 重新分析修改內容';
@@ -1063,6 +1172,7 @@
     window.resetForm = function () {
         document.getElementById('jpyPrice').value = '';
         document.getElementById('itemName').value = '';
+        window.setExpenseAmountMode('jpy');
         document.getElementById('helperTwd').value = '';
         document.getElementById('helperBox').style.display = 'none';
         hideAnalysis();
