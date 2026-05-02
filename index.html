@@ -232,7 +232,7 @@
 
     <div class="summary-banner">
         <div class="summary-row">
-            <div class="summary-item"><div>實付總額 (TWD)</div><span id="sumTotal">0</span></div>
+            <div class="summary-item"><div>記帳總額 (TWD)</div><span id="sumTotal">0</span></div>
             <div class="summary-item" id="sumSavedBox"><div>刷卡共省 (TWD)</div><span id="sumSaved" style="color: #ffeb3b;">0</span></div>
         </div>
     </div>
@@ -856,7 +856,8 @@
             analysisContent.innerHTML = `
                 • 品項：${name}<br>
                 • 回饋方案：${getCurrentRewardPlan().label}<br>
-                • 刷卡估計實付：$${Math.round(cardFinal).toLocaleString()} TWD <br>
+                • 記帳金額（日幣 × 刷卡匯率）：$${Math.round(thisBase).toLocaleString()} TWD <br>
+                • 刷卡實際比較成本：$${Math.round(cardFinal).toLocaleString()} TWD <br>
                 • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
                 • 回饋：${reward.desc}，約 $${Math.round(reward.amount).toLocaleString()} TWD <br>
                 • 手續費：1.5%，約 $${Math.round(feeTwd).toLocaleString()} TWD <br>
@@ -878,8 +879,9 @@
         let sorted = [...records].reverse();
 
         sorted = sorted.map(r => {
-            let finalTwdCost, feeTwd = 0, saved = 0, rewardAmount = 0, rewardDesc = '';
+            let accountingTwdCost, finalTwdCost, feeTwd = 0, saved = 0, rewardAmount = 0, rewardDesc = '';
             const thisBase = Number(r.jpy) * Number(r.cardRate);
+            accountingTwdCost = thisBase;
             if (r.type === 'card') {
                 const reward = getCardReward(thisBase, runningCardBase);
                 rewardAmount = reward.amount;
@@ -892,7 +894,7 @@
                 finalTwdCost = Number(r.jpy) * CASH_RATE;
                 rewardDesc = '現金';
             }
-            return { ...r, finalTwdCost, feeTwd, saved, rewardAmount, rewardDesc };
+            return { ...r, accountingTwdCost, finalTwdCost, feeTwd, saved, rewardAmount, rewardDesc };
         });
 
         records = sorted.reverse();
@@ -902,7 +904,7 @@
         if(currentView === 'cash') filterRecords = records.filter(r => r.type === 'cash');
 
         let totalTwd = 0, totalSaved = 0;
-        filterRecords.forEach(r => { totalTwd += r.finalTwdCost || 0; totalSaved += (r.saved || 0); });
+        filterRecords.forEach(r => { totalTwd += r.accountingTwdCost || 0; totalSaved += (r.saved || 0); });
         document.getElementById('sumTotal').innerText = Math.round(totalTwd).toLocaleString();
         document.getElementById('sumSaved').innerText = Math.round(totalSaved).toLocaleString();
         document.getElementById('sumSavedBox').style.display = currentView === 'cash' ? 'none' : 'block';
@@ -940,9 +942,10 @@
                     <div class="action-btn" style="color:var(--primary)" onclick="deleteRecord('${r.id}')">✕</div>
                 </div>
                 <div class="record-title">${r.name} <span class="tag ${isCard ? 'tag-card' : 'tag-cash'}">${isCard ? '💳 刷卡' : '💴 現金'}</span></div>
-                <div class="record-amount">¥ ${Number(r.jpy).toLocaleString()} ➜ $${Math.round(r.finalTwdCost).toLocaleString()} TWD</div>
+                <div class="record-amount">¥ ${Number(r.jpy).toLocaleString()} × ${r.cardRate} ➜ $${Math.round(r.accountingTwdCost).toLocaleString()} TWD</div>
                 <div class="record-detail">
                     匯率: ${r.cardRate}
+                    ${isCard ? `<br>實際比較成本: $${Math.round(r.finalTwdCost).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>回饋: ${r.rewardDesc}，約 $${Math.round(r.rewardAmount).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>手續費: 1.5%，約 $${Math.round(r.feeTwd).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br><span class="${r.saved >= 0 ? 'better' : 'worse'}">${r.saved >= 0 ? '比現金省約 $' + Math.round(r.saved).toLocaleString() : '比現金多花約 $' + Math.round(Math.abs(r.saved)).toLocaleString()}</span>` : ''}
