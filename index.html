@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swipe Wise - 修正 4.5% 回饋版</title>
+    <title>Swipe Wise - 消費日期版</title>
     <style>
         :root {
             --primary: #d32f2f;
@@ -214,6 +214,9 @@
         <label>消費品項</label>
         <input type="text" id="itemName" placeholder="例如：藥妝、壽司" oninput="hideAnalysis()">
 
+        <label>消費日期</label>
+        <input type="date" id="expenseDate" onchange="hideAnalysis()">
+
         <label>金額輸入方式</label>
         <select id="expenseAmountMode" onchange="setExpenseAmountMode(this.value)">
             <option value="jpy">日幣 + 匯率</option>
@@ -368,6 +371,14 @@
     let currentCashRate = DEFAULT_CASH_RATE;
     const BANK_FEE_RATE = 0.015;
 
+    function getLocalTodayString() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
     const REWARD_PLANS = {
         sixThenTwo: {
             key: 'sixThenTwo',
@@ -438,7 +449,8 @@
     let unsubscribeBook = null;
 
     document.getElementById('cardRate').value = localStorage.getItem('jp_last_rate') || currentCashRate.toFixed(5);
-    document.getElementById('exchangeDate').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('expenseDate').value = getLocalTodayString();
+    document.getElementById('exchangeDate').value = getLocalTodayString();
     updateRewardPlanUI();
     updateExpenseAmountModeUI();
     recalculateAndUI();
@@ -782,6 +794,9 @@
             }));
 
             records.sort((a, b) => {
+                const da = getDateSortValue(a);
+                const db = getDateSortValue(b);
+                if (da !== db) return db.localeCompare(da);
                 const ta = a.createdAt?.seconds || 0;
                 const tb = b.createdAt?.seconds || 0;
                 return tb - ta;
@@ -946,6 +961,28 @@
         return Number(r.jpy || 0) * Number(r.cardRate || getCashRate());
     }
 
+    function getRecordDate(r) {
+        if (r.expenseDate) return r.expenseDate;
+        if (r.date) return r.date;
+        if (r.createdAt?.seconds) {
+            const d = new Date(r.createdAt.seconds * 1000);
+            return d.toISOString().slice(0, 10);
+        }
+        return '';
+    }
+
+    function formatRecordDate(r) {
+        const date = getRecordDate(r);
+        return date || '未填日期';
+    }
+
+    function getDateSortValue(r) {
+        const date = getRecordDate(r);
+        if (date) return date;
+        const sec = r.createdAt?.seconds || 0;
+        return sec ? new Date(sec * 1000).toISOString().slice(0, 10) : '';
+    }
+
     function formatRecordAmountLine(r) {
         if (getRecordAmountMode(r) === 'twd') {
             return `$${Math.round(getRecordBaseTwd(r)).toLocaleString()} TWD`;
@@ -955,6 +992,7 @@
 
     window.calculate = function () {
         const name = document.getElementById('itemName').value || (currentInputType === 'card' ? '刷卡消費' : '現金消費');
+        const expenseDate = document.getElementById('expenseDate').value || getLocalTodayString();
         const amountMode = document.getElementById('expenseAmountMode')?.value || 'jpy';
         const amountValue = parseFloat(document.getElementById('jpyPrice').value);
         const cardRate = currentInputType === 'card' ? parseFloat(document.getElementById('cardRate').value) : getCashRate();
@@ -971,16 +1009,18 @@
                 const cashFinal = amountValue;
                 analysisContent.innerHTML = `
                     • 品項：${name}<br>
+                    • 日期：${expenseDate}<br>
                     • 現金記帳金額：$${Math.round(cashFinal).toLocaleString()} TWD <br>
                 `;
-                tempCalc = { name, amountMode: 'twd', twdAmount: amountValue, jpy: 0, cardRate: 1, type: currentInputType };
+                tempCalc = { name, expenseDate, amountMode: 'twd', twdAmount: amountValue, jpy: 0, cardRate: 1, type: currentInputType };
             } else {
                 const cashFinal = amountValue * getCashRate();
                 analysisContent.innerHTML = `
                     • 品項：${name}<br>
+                    • 日期：${expenseDate}<br>
                     • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
                 `;
-                tempCalc = { name, amountMode: 'jpy', jpy: amountValue, cardRate: getCashRate(), type: currentInputType };
+                tempCalc = { name, expenseDate, amountMode: 'jpy', jpy: amountValue, cardRate: getCashRate(), type: currentInputType };
             }
         } else {
             const inputRewardPlanKey = currentRewardPlanKey;
@@ -999,17 +1039,19 @@
             if (amountMode === 'twd') {
                 analysisContent.innerHTML = `
                     • 品項：${name}<br>
+                    • 日期：${expenseDate}<br>
                     • 回饋方案：${getRewardPlanByKey(inputRewardPlanKey).label}<br>
                     • 刷卡實際成本：$${Math.round(cardFinal).toLocaleString()} TWD <br>
                     • 回饋：${reward.desc}，約 $${Math.round(reward.amount).toLocaleString()} TWD <br>
                     • 手續費：${formatCardFeeLabel(inputRewardPlanKey)}，約 $${Math.round(feeTwd).toLocaleString()} TWD <br>
                 `;
-                tempCalc = { name, amountMode: 'twd', twdAmount: amountValue, jpy: 0, cardRate: 1, type: currentInputType, rewardPlanKey: inputRewardPlanKey, rewardPlanLabel: getRewardPlanByKey(inputRewardPlanKey).label };
+                tempCalc = { name, expenseDate, amountMode: 'twd', twdAmount: amountValue, jpy: 0, cardRate: 1, type: currentInputType, rewardPlanKey: inputRewardPlanKey, rewardPlanLabel: getRewardPlanByKey(inputRewardPlanKey).label };
             } else {
                 const cashFinal = amountValue * getCashRate();
                 const saved = cashFinal - cardFinal;
                 analysisContent.innerHTML = `
                     • 品項：${name}<br>
+                    • 日期：${expenseDate}<br>
                     • 回饋方案：${getRewardPlanByKey(inputRewardPlanKey).label}<br>
                     • 刷卡實際比較成本：$${Math.round(cardFinal).toLocaleString()} TWD <br>
                     • 回饋：${reward.desc}，約 $${Math.round(reward.amount).toLocaleString()} TWD <br>
@@ -1018,7 +1060,7 @@
                         ➔ ${saved >= 0 ? '刷卡比現金省約 $' + Math.round(saved).toLocaleString() : '刷卡比現金多花約 $' + Math.round(Math.abs(saved)).toLocaleString()}
                     </span>
                 `;
-                tempCalc = { name, amountMode: 'jpy', jpy: amountValue, cardRate, type: currentInputType, rewardPlanKey: inputRewardPlanKey, rewardPlanLabel: getRewardPlanByKey(inputRewardPlanKey).label };
+                tempCalc = { name, expenseDate, amountMode: 'jpy', jpy: amountValue, cardRate, type: currentInputType, rewardPlanKey: inputRewardPlanKey, rewardPlanLabel: getRewardPlanByKey(inputRewardPlanKey).label };
                 localStorage.setItem('jp_last_rate', cardRate);
             }
         }
@@ -1111,6 +1153,7 @@
                     <div class="action-btn" style="color:var(--primary)" onclick="deleteRecord('${r.id}')">✕</div>
                 </div>
                 <div class="record-title">${r.name} <span class="tag ${isCard ? 'tag-card' : 'tag-cash'}">${isCard ? '💳 刷卡' : '💴 現金'}</span></div>
+                <div class="record-detail">日期：${formatRecordDate(r)}</div>
                 <div class="record-amount">${formatRecordAmountLine(r)}</div>
                 <div class="record-detail">
                     ${amountMode === 'jpy' ? `匯率: ${r.cardRate} <br>` : ''}
@@ -1170,6 +1213,7 @@
         const amountMode = getRecordAmountMode(r);
         window.setExpenseAmountMode(amountMode);
         document.getElementById('itemName').value = r.name;
+        document.getElementById('expenseDate').value = getRecordDate(r) || getLocalTodayString();
         document.getElementById('jpyPrice').value = amountMode === 'twd' ? (r.twdAmount || r.accountingTwdCost || r.accountingTwd || 0) : r.jpy;
         if(r.type === 'card') {
             if (amountMode === 'jpy') document.getElementById('cardRate').value = r.cardRate;
@@ -1198,6 +1242,7 @@
     window.resetForm = function () {
         document.getElementById('jpyPrice').value = '';
         document.getElementById('itemName').value = '';
+        document.getElementById('expenseDate').value = getLocalTodayString();
         window.setExpenseAmountMode('jpy');
         document.getElementById('helperTwd').value = '';
         document.getElementById('helperBox').style.display = 'none';
@@ -1238,7 +1283,7 @@
 
     function resetExchangeForm() {
         editingExchangeId = null;
-        document.getElementById('exchangeDate').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('exchangeDate').value = getLocalTodayString();
         document.getElementById('exchangeJpy').value = '';
         document.getElementById('exchangeTwd').value = '';
         document.getElementById('exchangeRate').value = '';
@@ -1329,7 +1374,7 @@
         const r = exchangeRecords.find(item => item.id === id);
         if (!r) return;
         editingExchangeId = id;
-        document.getElementById('exchangeDate').value = r.date || new Date().toISOString().slice(0, 10);
+        document.getElementById('exchangeDate').value = r.date || getLocalTodayString();
         document.getElementById('exchangeJpy').value = r.jpy || '';
         document.getElementById('exchangeTwd').value = r.twd || '';
         document.getElementById('exchangeRate').value = r.rate || '';
