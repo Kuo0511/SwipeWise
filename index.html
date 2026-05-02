@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swipe Wise Firebase 共用帳本版 - 浮動登入</title>
+    <title>Swipe Wise Firebase 共用帳本版 - 回饋方案切換</title>
     <style>
         :root {
             --primary: #d32f2f;
@@ -85,6 +85,11 @@
         .book-switch-item.active { background: #e8f5e9; border-color: var(--secondary); color: var(--secondary); }
         .book-switch-item small { display:block; color:#777; font-weight:500; margin-top:2px; word-break:break-all; }
         .mini-btn { padding: 8px 10px !important; font-size: 0.78em !important; border-radius: 9px !important; }
+
+        .reward-plan-card { background: #fff8f0; border: 1px solid #ffe0b2; }
+        .reward-plan-select { width: 100%; padding: 12px; border: 2px solid #ffe0b2; border-radius: 12px; background: white; color: #333; font-size: 0.95em; font-weight: 800; box-sizing: border-box; margin-top: 8px; margin-bottom: 6px; }
+        .reward-plan-select:focus { outline: none; border-color: #f58559; box-shadow: 0 0 0 3px rgba(245, 133, 89, 0.15); }
+        .reward-plan-hint { font-size: 0.76em; color: #777; line-height: 1.45; margin-top: 8px; }
         @media (max-width: 600px) {
             body { padding-top: 58px; }
             .floating-auth { top: 8px; right: 8px; left: 8px; width: auto; }
@@ -121,6 +126,13 @@
             <button class="mini-btn" onclick="loadUserBooks()" style="background:#f1f3f4; color:#555; margin-bottom:8px;">重新整理帳本清單</button>
 
             <div id="currentBookInfo" style="margin-top:10px; font-size:0.82em; color:#555; white-space:pre-wrap; word-break:break-all;"></div>
+
+            <label style="margin-top:12px;">回饋方案</label>
+            <select class="reward-plan-select" onchange="setRewardPlan(this.value)">
+                <option value="sixThenTwo">6% 額度 25,000，滿額後 2%</option>
+                <option value="threeUnlimited">3% 無上限</option>
+            </select>
+            <div id="rewardPlanHint" class="reward-plan-hint">回饋方案會影響刷卡分析、紀錄回饋與進度條。</div>
         </div>
         <button class="auth-close" onclick="toggleAuthPanel(false)">收起面板</button>
     </div>
@@ -129,7 +141,16 @@
 <div class="container">
     <h2 style="color: #333;">Swipe Wise</h2>
     
-    <div class="cash-info">現金匯率：<strong>0.19882</strong> | 6% 額度：<strong>$25,000</strong></div>
+    <div class="cash-info" id="cashInfo">現金匯率：<strong>0.19882</strong> | 回饋方案載入中</div>
+
+    <div class="card reward-plan-card">
+        <label>回饋方案</label>
+        <select class="reward-plan-select" onchange="setRewardPlan(this.value)">
+            <option value="sixThenTwo">6% 額度 25,000，滿額後 2%</option>
+            <option value="threeUnlimited">3% 無上限</option>
+        </select>
+        <div class="reward-plan-hint">此設定會套用到刷卡分析、記錄與回饋進度。已選帳本時也會同步給共用成員。</div>
+    </div>
 
     <div class="card" style="background: #f8f9fa;">
         <label>支付方式</label>
@@ -229,9 +250,26 @@
 
     const CASH_RATE = 0.19882;
     const BANK_FEE_RATE = 0.015;
-    const REWARD_LIMIT = 25000;
-    const HIGH_REWARD = 0.06;
-    const LOW_REWARD = 0.02;
+
+    const REWARD_PLANS = {
+        sixThenTwo: {
+            key: 'sixThenTwo',
+            label: '6% 額度 $25,000，滿額後 2%',
+            highRate: 0.06,
+            lowRate: 0.02,
+            limit: 25000,
+            unlimited: false
+        },
+        threeUnlimited: {
+            key: 'threeUnlimited',
+            label: '3% 無上限',
+            highRate: 0.03,
+            lowRate: 0.03,
+            limit: Infinity,
+            unlimited: true
+        }
+    };
+    let currentRewardPlanKey = localStorage.getItem('swipe_reward_plan') || 'sixThenTwo';
 
     let currentInputType = 'card';
     let currentView = 'all';
@@ -242,8 +280,10 @@
     let currentUser = null;
     let currentBookId = localStorage.getItem('currentBookId') || null;
     let unsubscribeRecords = null;
+    let unsubscribeBook = null;
 
     document.getElementById('cardRate').value = localStorage.getItem('jp_last_rate') || 0.19882;
+    updateRewardPlanUI();
     recalculateAndUI();
 
 
@@ -289,6 +329,78 @@
         const label = name ? `目前帳本：${name}` : '目前帳本';
         document.getElementById('currentBookInfo').innerText = `${label}\n帳本 ID：${bookId}`;
         document.getElementById('loginStatus').innerText = '已連線帳本';
+    }
+
+    function getCurrentRewardPlan() {
+        return REWARD_PLANS[currentRewardPlanKey] || REWARD_PLANS.sixThenTwo;
+    }
+
+    function updateRewardPlanUI() {
+        const plan = getCurrentRewardPlan();
+
+        document.querySelectorAll('.reward-plan-select').forEach(select => {
+            select.value = plan.key;
+        });
+
+        const cashInfo = document.getElementById('cashInfo');
+        if (cashInfo) {
+            cashInfo.innerHTML = `現金匯率：<strong>${CASH_RATE}</strong> | 回饋方案：<strong>${plan.label}</strong>`;
+        }
+
+        const hint = document.getElementById('rewardPlanHint');
+        if (hint) {
+            hint.innerText = currentBookId
+                ? '目前回饋方案會儲存在此共用帳本，其他成員切換到此帳本也會套用同一方案。'
+                : '尚未選擇帳本時，回饋方案只會暫存在此瀏覽器。';
+        }
+    }
+
+    async function persistRewardPlanToBook() {
+        if (!currentUser || !currentBookId) return;
+        await updateDoc(doc(db, 'books', currentBookId), {
+            rewardPlanKey: currentRewardPlanKey,
+            rewardPlanUpdatedBy: currentUser.uid,
+            rewardPlanUpdatedByEmail: currentUser.email,
+            rewardPlanUpdatedAt: serverTimestamp()
+        });
+    }
+
+    window.setRewardPlan = async function (planKey, options = {}) {
+        if (!REWARD_PLANS[planKey]) return;
+
+        currentRewardPlanKey = planKey;
+        localStorage.setItem('swipe_reward_plan', currentRewardPlanKey);
+        updateRewardPlanUI();
+        hideAnalysis();
+        recalculateAndUI();
+
+        if (!options.skipSave && currentUser && currentBookId) {
+            try {
+                await persistRewardPlanToBook();
+            } catch (error) {
+                console.error(error);
+                alert('回饋方案已套用在本機，但同步到 Firestore 失敗：' + error.message);
+            }
+        }
+    };
+
+    function listenBookSettings(bookId) {
+        if (unsubscribeBook) {
+            unsubscribeBook();
+            unsubscribeBook = null;
+        }
+        if (!bookId) return;
+
+        unsubscribeBook = onSnapshot(doc(db, 'books', bookId), (snap) => {
+            const planKey = snap.exists() ? snap.data().rewardPlanKey : null;
+            if (REWARD_PLANS[planKey]) {
+                window.setRewardPlan(planKey, { skipSave: true });
+            } else {
+                updateRewardPlanUI();
+            }
+        }, (error) => {
+            console.warn('讀取回饋方案失敗：', error);
+        });
     }
 
     async function getBookName(bookId) {
@@ -344,6 +456,7 @@
         tempCalc = null;
         resetForm();
         updateCurrentBookInfo(bookName, currentBookId);
+        listenBookSettings(currentBookId);
         listenRecords(currentBookId);
         await window.loadUserBooks();
     };
@@ -369,6 +482,7 @@
 
             if (currentBookId) {
                 getBookName(currentBookId).then((name) => updateCurrentBookInfo(name, currentBookId));
+                listenBookSettings(currentBookId);
                 listenRecords(currentBookId);
             }
         } else {
@@ -389,7 +503,12 @@
                 unsubscribeRecords();
                 unsubscribeRecords = null;
             }
+            if (unsubscribeBook) {
+                unsubscribeBook();
+                unsubscribeBook = null;
+            }
 
+            updateRewardPlanUI();
             recalculateAndUI();
         }
     });
@@ -406,6 +525,7 @@
             const bookRef = await addDoc(collection(db, 'books'), {
                 name,
                 ownerUid: currentUser.uid,
+                rewardPlanKey: currentRewardPlanKey,
                 createdAt: serverTimestamp()
             });
 
@@ -424,6 +544,7 @@
             document.getElementById('loginStatus').innerText = '已連線帳本';
 
             await window.loadUserBooks();
+            listenBookSettings(currentBookId);
             listenRecords(currentBookId);
         } catch (error) {
             console.error(error);
@@ -461,6 +582,7 @@
             document.getElementById('loginStatus').innerText = '已連線帳本';
 
             await window.loadUserBooks();
+            listenBookSettings(currentBookId);
             listenRecords(currentBookId);
         } catch (error) {
             console.error(error);
@@ -529,17 +651,26 @@
     }
 
     function getCardReward(base, runningBase) {
-        if (runningBase >= REWARD_LIMIT) {
-            return { amount: base * LOW_REWARD, desc: '2%' };
-        }
-        if (runningBase + base <= REWARD_LIMIT) {
-            return { amount: base * HIGH_REWARD, desc: '6%' };
+        const plan = getCurrentRewardPlan();
+
+        if (plan.unlimited) {
+            return {
+                amount: base * plan.highRate,
+                desc: '3% 無上限'
+            };
         }
 
-        const highRewardBase = REWARD_LIMIT - runningBase;
+        if (runningBase >= plan.limit) {
+            return { amount: base * plan.lowRate, desc: '2%' };
+        }
+        if (runningBase + base <= plan.limit) {
+            return { amount: base * plan.highRate, desc: '6%' };
+        }
+
+        const highRewardBase = plan.limit - runningBase;
         const lowRewardBase = base - highRewardBase;
         return {
-            amount: (highRewardBase * HIGH_REWARD) + (lowRewardBase * LOW_REWARD),
+            amount: (highRewardBase * plan.highRate) + (lowRewardBase * plan.lowRate),
             desc: '分段 6% / 2%'
         };
     }
@@ -575,6 +706,7 @@
 
             analysisContent.innerHTML = `
                 • 品項：${name}<br>
+                • 回饋方案：${getCurrentRewardPlan().label}<br>
                 • 刷卡估計實付：$${Math.round(cardFinal).toLocaleString()} TWD <br>
                 • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
                 • 回饋：${reward.desc}，約 $${Math.round(reward.amount).toLocaleString()} TWD <br>
@@ -626,9 +758,15 @@
         document.getElementById('sumSaved').innerText = Math.round(totalSaved).toLocaleString();
         document.getElementById('sumSavedBox').style.display = currentView === 'cash' ? 'none' : 'block';
 
-        const progress = Math.min((runningCardBase / REWARD_LIMIT) * 100, 100);
-        document.getElementById('progressBar').style.width = progress + '%';
-        document.getElementById('progressText').innerText = `$${Math.round(runningCardBase).toLocaleString()} / $25,000`;
+        const plan = getCurrentRewardPlan();
+        if (plan.unlimited) {
+            document.getElementById('progressBar').style.width = '100%';
+            document.getElementById('progressText').innerText = `$${Math.round(runningCardBase).toLocaleString()} / 無上限（3%）`;
+        } else {
+            const progress = Math.min((runningCardBase / plan.limit) * 100, 100);
+            document.getElementById('progressBar').style.width = progress + '%';
+            document.getElementById('progressText').innerText = `$${Math.round(runningCardBase).toLocaleString()} / $${Math.round(plan.limit).toLocaleString()}（6%，滿額後 2%）`;
+        }
 
         const list = document.getElementById('recordList');
         list.innerHTML = '';
