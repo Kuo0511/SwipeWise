@@ -943,7 +943,7 @@
         if (getRecordAmountMode(r) === 'twd') {
             return `$${Math.round(getRecordBaseTwd(r)).toLocaleString()} TWD`;
         }
-        return `¥ ${Number(r.jpy || 0).toLocaleString()} × ${r.cardRate} ➜ $${Math.round(getRecordBaseTwd(r)).toLocaleString()} TWD`;
+        return `¥ ${Number(r.jpy || 0).toLocaleString()} ➜ $${Math.round(getRecordBaseTwd(r)).toLocaleString()} TWD`;
     }
 
     window.calculate = function () {
@@ -1114,14 +1114,11 @@
                 <div class="record-title">${r.name} <span class="tag ${isCard ? 'tag-card' : 'tag-cash'}">${isCard ? '💳 刷卡' : '💴 現金'}</span></div>
                 <div class="record-amount">${formatRecordAmountLine(r)}</div>
                 <div class="record-detail">
-                    輸入方式: ${amountMode === 'twd' ? '只輸入台幣' : '日幣 + 匯率'}
                     ${amountMode === 'jpy' ? `<br>匯率: ${r.cardRate}` : ''}
-                    ${isCard ? `<br>回饋方案: ${getRewardPlanByKey(getRecordRewardPlanKey(r)).label}` : ''}
                     ${isCard ? `<br>實際成本: $${Math.round(r.finalTwdCost).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>回饋: ${r.rewardDesc}，約 $${Math.round(r.rewardAmount).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>手續費: ${formatCardFeeLabel(getRecordRewardPlanKey(r))}，約 $${Math.round(r.feeTwd).toLocaleString()} TWD` : ''}
                     ${hasCashComparison ? `<br><span class="${r.saved >= 0 ? 'better' : 'worse'}">${r.saved >= 0 ? '比現金省約 $' + Math.round(r.saved).toLocaleString() : '比現金多花約 $' + Math.round(Math.abs(r.saved)).toLocaleString()}</span>` : ''}
-                    ${isCard && amountMode === 'twd' ? `<br><span class="muted">台幣輸入無日幣基準，未計算比現金省多少。</span>` : ''}
                     ${r.createdByEmail ? `<br><span class="muted">建立者：${r.createdByEmail}</span>` : ''}
                 </div>
             `;
