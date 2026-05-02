@@ -151,7 +151,7 @@
                 <option value="sixThenTwo">6% 額度 25,000，滿額後 2%</option>
                 <option value="threeUnlimited">3% 無上限</option>
             </select>
-            <div id="rewardPlanHint" class="reward-plan-hint">回饋方案會影響刷卡分析、紀錄回饋與進度條。</div>
+            <div id="rewardPlanHint" class="reward-plan-hint">回饋方案只套用於新增或編輯當下這筆資料。</div>
         </div>
 
         <div class="drawer-section-title">頁面切換</div>
@@ -444,12 +444,6 @@
         }, { merge: true });
     }
 
-    function updateCurrentBookInfo(name, bookId) {
-        const label = name ? `目前帳本：${name}` : '目前帳本';
-        document.getElementById('currentBookInfo').innerText = `${label}\n帳本 ID：${bookId}`;
-        document.getElementById('loginStatus').innerText = '已連線帳本';
-    }
-
     function getCurrentRewardPlan() {
         return REWARD_PLANS[currentRewardPlanKey] || REWARD_PLANS.sixThenTwo;
     }
@@ -484,12 +478,7 @@
             cashInfo.innerHTML = `現金匯率：<strong>${cashRateLabel}</strong> | 回饋方案：<strong>${plan.label}</strong>`;
         }
 
-        const hint = document.getElementById('rewardPlanHint');
-        if (hint) {
-            hint.innerText = currentBookId
-                ? '目前回饋方案會儲存在此共用帳本，其他成員切換到此帳本也會套用同一方案。'
-                : '尚未選擇帳本時，回饋方案只會暫存在此瀏覽器。';
-        }
+       
     }
 
     async function persistRewardPlanToBook() {
@@ -592,7 +581,6 @@
         editingId = null;
         tempCalc = null;
         resetForm();
-        updateCurrentBookInfo(bookName, currentBookId);
         listenBookSettings(currentBookId);
         listenRecords(currentBookId);
         listenExchangeRecords(currentBookId);
@@ -828,8 +816,17 @@
         window.hideAnalysis();
     }
 
-    function getCardReward(base, runningBase) {
-        const plan = getCurrentRewardPlan();
+    function getRewardPlanByKey(planKey) {
+        return REWARD_PLANS[planKey] || REWARD_PLANS.sixThenTwo;
+    }
+
+    function getRecordRewardPlanKey(record) {
+        // 舊資料若沒有 rewardPlanKey，預設視為舊版的 6% / 2% 方案。
+        return record?.rewardPlanKey || 'sixThenTwo';
+    }
+
+    function getCardReward(base, runningBase, planKey = currentRewardPlanKey) {
+        const plan = getRewardPlanByKey(planKey);
 
         if (plan.unlimited) {
             return {
@@ -873,10 +870,15 @@
             `;
             tempCalc = { name, jpy, cardRate: getCashRate(), type: currentInputType };
         } else {
-            const currentRunningBase = records.filter(r => r.id !== editingId && r.type === 'card')
+            const inputRewardPlanKey = currentRewardPlanKey;
+            const currentRunningBase = records.filter(r =>
+                    r.id !== editingId &&
+                    r.type === 'card' &&
+                    getRecordRewardPlanKey(r) === inputRewardPlanKey
+                )
                 .reduce((sum, r) => sum + (Number(r.jpy) * Number(r.cardRate)), 0);
             const thisBase = jpy * cardRate;
-            const reward = getCardReward(thisBase, currentRunningBase);
+            const reward = getCardReward(thisBase, currentRunningBase, inputRewardPlanKey);
             const feeTwd = thisBase * BANK_FEE_RATE;
             const cardFinal = thisBase + feeTwd - reward.amount;
             const cashFinal = jpy * getCashRate();
@@ -884,7 +886,7 @@
 
             analysisContent.innerHTML = `
                 • 品項：${name}<br>
-                • 回饋方案：${getCurrentRewardPlan().label}<br>
+                • 回饋方案：${getRewardPlanByKey(inputRewardPlanKey).label}<br>
                 • 記帳金額（日幣 × 刷卡匯率）：$${Math.round(thisBase).toLocaleString()} TWD <br>
                 • 刷卡實際比較成本：$${Math.round(cardFinal).toLocaleString()} TWD <br>
                 • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
@@ -894,7 +896,7 @@
                     ➔ ${saved >= 0 ? '刷卡比現金省約 $' + Math.round(saved).toLocaleString() : '刷卡比現金多花約 $' + Math.round(Math.abs(saved)).toLocaleString()}
                 </span>
             `;
-            tempCalc = { name, jpy, cardRate, type: currentInputType };
+            tempCalc = { name, jpy, cardRate, type: currentInputType, rewardPlanKey: inputRewardPlanKey, rewardPlanLabel: getRewardPlanByKey(inputRewardPlanKey).label };
             localStorage.setItem('jp_last_rate', cardRate);
         }
 
@@ -904,7 +906,8 @@
     };
 
     function recalculateAndUI() {
-        let runningCardBase = 0;
+        const runningCardBaseByPlan = {};
+        let selectedPlanRunningBase = 0;
         let sorted = [...records].reverse();
 
         sorted = sorted.map(r => {
@@ -912,13 +915,16 @@
             const thisBase = Number(r.jpy) * Number(r.cardRate);
             accountingTwdCost = thisBase;
             if (r.type === 'card') {
-                const reward = getCardReward(thisBase, runningCardBase);
+                const recordPlanKey = getRecordRewardPlanKey(r);
+                const runningBaseForPlan = runningCardBaseByPlan[recordPlanKey] || 0;
+                const reward = getCardReward(thisBase, runningBaseForPlan, recordPlanKey);
                 rewardAmount = reward.amount;
                 rewardDesc = reward.desc;
                 feeTwd = thisBase * BANK_FEE_RATE;
                 finalTwdCost = thisBase + feeTwd - rewardAmount;
                 saved = (Number(r.jpy) * getCashRate()) - finalTwdCost;
-                runningCardBase += thisBase;
+                runningCardBaseByPlan[recordPlanKey] = runningBaseForPlan + thisBase;
+                if (recordPlanKey === currentRewardPlanKey) selectedPlanRunningBase += thisBase;
             } else {
                 finalTwdCost = Number(r.jpy) * getCashRate();
                 rewardDesc = '現金';
@@ -941,11 +947,11 @@
         const plan = getCurrentRewardPlan();
         if (plan.unlimited) {
             document.getElementById('progressBar').style.width = '100%';
-            document.getElementById('progressText').innerText = `$${Math.round(runningCardBase).toLocaleString()} / 無上限（3%）`;
+            document.getElementById('progressText').innerText = `$${Math.round(selectedPlanRunningBase).toLocaleString()} / 無上限（3%）`;
         } else {
-            const progress = Math.min((runningCardBase / plan.limit) * 100, 100);
+            const progress = Math.min((selectedPlanRunningBase / plan.limit) * 100, 100);
             document.getElementById('progressBar').style.width = progress + '%';
-            document.getElementById('progressText').innerText = `$${Math.round(runningCardBase).toLocaleString()} / $${Math.round(plan.limit).toLocaleString()}（6%，滿額後 2%）`;
+            document.getElementById('progressText').innerText = `$${Math.round(selectedPlanRunningBase).toLocaleString()} / $${Math.round(plan.limit).toLocaleString()}（6%，滿額後 2%）`;
         }
 
         const list = document.getElementById('recordList');
@@ -974,6 +980,7 @@
                 <div class="record-amount">¥ ${Number(r.jpy).toLocaleString()} × ${r.cardRate} ➜ $${Math.round(r.accountingTwdCost).toLocaleString()} TWD</div>
                 <div class="record-detail">
                     匯率: ${r.cardRate}
+                    ${isCard ? `<br>回饋方案: ${getRewardPlanByKey(getRecordRewardPlanKey(r)).label}` : ''}
                     ${isCard ? `<br>實際比較成本: $${Math.round(r.finalTwdCost).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>回饋: ${r.rewardDesc}，約 $${Math.round(r.rewardAmount).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>手續費: 1.5%，約 $${Math.round(r.feeTwd).toLocaleString()} TWD` : ''}
@@ -1029,7 +1036,10 @@
         window.setType(r.type || 'card');
         document.getElementById('itemName').value = r.name;
         document.getElementById('jpyPrice').value = r.jpy;
-        if(r.type === 'card') document.getElementById('cardRate').value = r.cardRate;
+        if(r.type === 'card') {
+            document.getElementById('cardRate').value = r.cardRate;
+            window.setRewardPlan(getRecordRewardPlanKey(r), { skipSave: true });
+        }
         document.getElementById('mainBtn').innerText = '🔄 重新分析修改內容';
         hideAnalysis();
         window.scrollTo({ top: 0, behavior: 'smooth' });
