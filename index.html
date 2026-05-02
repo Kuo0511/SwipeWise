@@ -149,9 +149,9 @@
             <label>回饋方案</label>
             <select class="reward-plan-select" onchange="setRewardPlan(this.value)">
                 <option value="sixThenTwo">6% 額度 25,000，滿額後 2%</option>
-                <option value="threeUnlimited">3% 無上限</option>
-                <option value="nipponPrize">日本賞 3.5% 無上限（免 1.5% 手續費）</option>
-                <option value="domesticThree">國內 3% 無上限（免手續費）</option>
+                <option value="threeUnlimited">國外 3% 無上限</option>
+                <option value="nipponPrize">日本賞 3.5% 無上限</option>
+                <option value="domesticThree">國內 3% 無上限</option>
             </select>
             <div id="rewardPlanHint" class="reward-plan-hint">回饋方案只套用於新增或編輯當下這筆資料。</div>
         </div>
@@ -380,17 +380,17 @@
         },
         threeUnlimited: {
             key: 'threeUnlimited',
-            label: '3% 無上限',
+            label: '國外 3% 無上限',
             highRate: 0.03,
             lowRate: 0.03,
             limit: Infinity,
             unlimited: true,
             feeRate: BANK_FEE_RATE,
-            rewardDesc: '3% 無上限'
+            rewardDesc: '國外 3% 無上限'
         },
         nipponPrize: {
             key: 'nipponPrize',
-            label: '日本賞 3.5% 無上限（免 1.5% 手續費）',
+            label: '日本賞 3.5% 無上限',
             highRate: 0.035,
             lowRate: 0.035,
             limit: Infinity,
