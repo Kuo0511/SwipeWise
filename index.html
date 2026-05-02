@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swipe Wise Firebase 共用帳本版 - 側邊選單</title>
+    <title>Swipe Wise - 修正 4.5% 回饋版</title>
     <style>
         :root {
             --primary: #d32f2f;
@@ -406,8 +406,8 @@
             lowRate: 0.035,
             limit: Infinity,
             unlimited: true,
-            feeRate: BANK_FEE_RATE,
-            rewardDesc: '日本賞 3.5% 無上限'
+            feeRate: 0,
+            rewardDesc: '日本賞 3.5% 無上限（免手續費）'
         },
         domesticThree: {
             key: 'domesticThree',
@@ -919,18 +919,21 @@
             };
         }
 
+        const highLabel = formatPercent(plan.highRate);
+        const lowLabel = formatPercent(plan.lowRate);
+
         if (runningBase >= plan.limit) {
-            return { amount: base * plan.lowRate, desc: '2%' };
+            return { amount: base * plan.lowRate, desc: lowLabel };
         }
         if (runningBase + base <= plan.limit) {
-            return { amount: base * plan.highRate, desc: '6%' };
+            return { amount: base * plan.highRate, desc: highLabel };
         }
 
         const highRewardBase = plan.limit - runningBase;
         const lowRewardBase = base - highRewardBase;
         return {
             amount: (highRewardBase * plan.highRate) + (lowRewardBase * plan.lowRate),
-            desc: '分段 6% / 2%'
+            desc: `分段 ${highLabel} / ${lowLabel}`
         };
     }
 
@@ -1080,7 +1083,7 @@
         } else {
             const progress = Math.min((selectedPlanRunningBase / plan.limit) * 100, 100);
             document.getElementById('progressBar').style.width = progress + '%';
-            document.getElementById('progressText').innerText = `$${Math.round(selectedPlanRunningBase).toLocaleString()} / $${Math.round(plan.limit).toLocaleString()}（6%，滿額後 2%）`;
+            document.getElementById('progressText').innerText = `$${Math.round(selectedPlanRunningBase).toLocaleString()} / $${Math.round(plan.limit).toLocaleString()}（${formatPercent(plan.highRate)}，滿額後 ${formatPercent(plan.lowRate)}）`;
         }
 
         const list = document.getElementById('recordList');
