@@ -143,44 +143,54 @@
         <button class="drawer-close" onclick="toggleSideMenu(false)">✕</button>
     </div>
 
-    <div class="drawer-section-title">頁面切換</div>
-    <div class="page-tabs">
-        <div class="page-tab active" data-page="expense" onclick="setPage('expense')">🧾 消費記錄</div>
-        <div class="page-tab" data-page="exchange" onclick="setPage('exchange')">💱 現金換匯</div>
-    </div>
-
-    <div class="drawer-section-title">登入 / 帳本</div>
-    <div class="card" id="authCard">
-            <div id="userInfo" style="font-size:0.9em; margin-bottom:8px; color:#555;">尚未登入</div>
-            <div id="loginStatus" class="status-pill">未連線</div>
-            <button id="loginBtn" onclick="loginWithGoogle()" style="background:#4285f4; color:white; margin-top:10px;">使用 Google 登入</button>
-            <button id="logoutBtn" onclick="logout()" style="display:none; background:#777; color:white; margin-top:10px;">登出</button>
-        </div>
-
-    <div class="card" id="bookBox" style="display:none;">
-            <label>建立新帳本</label>
-            <input type="text" id="bookName" placeholder="例如：東京旅遊記帳">
-            <button onclick="createBook()" style="background:#673ab7; color:white; margin-bottom:10px;">建立共用帳本</button>
-
-            <label>加入朋友的帳本</label>
-            <input type="text" id="joinBookId" placeholder="輸入朋友給你的 bookId">
-            <button onclick="joinBook()" style="background:#2e7d32; color:white;">加入帳本</button>
-
-            <label style="margin-top:12px;">切換帳本</label>
-            <div id="bookList" class="book-switch-list">
-                <div class="muted" style="font-size:0.82em;">登入後會顯示已加入的帳本。</div>
-            </div>
-            <button class="mini-btn" onclick="loadUserBooks()" style="background:#f1f3f4; color:#555; margin-bottom:8px;">重新整理帳本清單</button>
-
-            <div id="currentBookInfo" style="margin-top:10px; font-size:0.82em; color:#555; white-space:pre-wrap; word-break:break-all;"></div>
-
-            <label style="margin-top:12px;">回饋方案</label>
+    <div id="bookBox" style="display:none;">
+        <div class="drawer-section-title">回饋方案</div>
+        <div class="card reward-plan-card">
+            <label>回饋方案</label>
             <select class="reward-plan-select" onchange="setRewardPlan(this.value)">
                 <option value="sixThenTwo">6% 額度 25,000，滿額後 2%</option>
                 <option value="threeUnlimited">3% 無上限</option>
             </select>
             <div id="rewardPlanHint" class="reward-plan-hint">回饋方案會影響刷卡分析、紀錄回饋與進度條。</div>
         </div>
+
+        <div class="drawer-section-title">頁面切換</div>
+        <div class="page-tabs">
+            <div class="page-tab active" data-page="expense" onclick="setPage('expense')">🧾 消費記錄</div>
+            <div class="page-tab" data-page="exchange" onclick="setPage('exchange')">💱 現金換匯</div>
+        </div>
+
+        <div class="drawer-section-title">切換帳本</div>
+        <div class="card">
+            <div id="bookList" class="book-switch-list">
+                <div class="muted" style="font-size:0.82em;">登入後會顯示已加入的帳本。</div>
+            </div>
+            <button class="mini-btn" onclick="loadUserBooks()" style="background:#f1f3f4; color:#555; margin-bottom:8px;">重新整理帳本清單</button>
+            <div id="currentBookInfo" style="margin-top:10px; font-size:0.82em; color:#555; white-space:pre-wrap; word-break:break-all;"></div>
+        </div>
+
+        <div class="drawer-section-title">建立帳本</div>
+        <div class="card">
+            <label>建立新帳本</label>
+            <input type="text" id="bookName" placeholder="例如：東京旅遊記帳">
+            <button onclick="createBook()" style="background:#673ab7; color:white; margin-bottom:10px;">建立共用帳本</button>
+        </div>
+
+        <div class="drawer-section-title">加入帳本</div>
+        <div class="card">
+            <label>加入朋友的帳本</label>
+            <input type="text" id="joinBookId" placeholder="輸入朋友給你的 bookId">
+            <button onclick="joinBook()" style="background:#2e7d32; color:white;">加入帳本</button>
+        </div>
+    </div>
+
+    <div class="drawer-section-title">登入 / 登出</div>
+    <div class="card" id="authCard">
+        <div id="userInfo" style="font-size:0.9em; margin-bottom:8px; color:#555;">尚未登入</div>
+        <div id="loginStatus" class="status-pill">未連線</div>
+        <button id="loginBtn" onclick="loginWithGoogle()" style="background:#4285f4; color:white; margin-top:10px;">使用 Google 登入</button>
+        <button id="logoutBtn" onclick="logout()" style="display:none; background:#777; color:white; margin-top:10px;">登出</button>
+    </div>
 </aside>
 
 <div class="container">
@@ -283,7 +293,7 @@
                 </div>
             </div>
             <div class="muted" style="font-size:0.75em; margin:-4px 0 10px; line-height:1.5;">
-                手續費為獨立欄位，不需要併入「取得日幣」或「支付台幣」。若以台幣輸入，系統會用 手續費 ÷ 匯率 換算日幣等值；若以日幣輸入，系統會用 手續費 × 匯率 換算台幣等值。
+                手續費為獨立欄位，不需要併入「取得日幣」或「支付台幣」。一般換匯會用支付台幣與取得日幣累積；若另有手續費，會換算後一起納入累積成本。若只記錄手續費，取得日幣與支付台幣可填 0，但必須填匯率：台幣手續費用「手續費 ÷ 匯率」換算日幣等值；日幣手續費用「手續費 × 匯率」換算台幣等值。
             </div>
             <label>備註</label>
             <input type="text" id="exchangeNote" placeholder="例如：機場 ATM、銀行換匯、便利商店 ATM">
@@ -342,7 +352,8 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    const CASH_RATE = 0.19882;
+    const DEFAULT_CASH_RATE = 0.19882;
+    let currentCashRate = DEFAULT_CASH_RATE;
     const BANK_FEE_RATE = 0.015;
 
     const REWARD_PLANS = {
@@ -379,7 +390,7 @@
     let unsubscribeExchangeRecords = null;
     let unsubscribeBook = null;
 
-    document.getElementById('cardRate').value = localStorage.getItem('jp_last_rate') || 0.19882;
+    document.getElementById('cardRate').value = localStorage.getItem('jp_last_rate') || currentCashRate.toFixed(5);
     document.getElementById('exchangeDate').value = new Date().toISOString().slice(0, 10);
     updateRewardPlanUI();
     recalculateAndUI();
@@ -443,6 +454,21 @@
         return REWARD_PLANS[currentRewardPlanKey] || REWARD_PLANS.sixThenTwo;
     }
 
+    function getCashRate() {
+        return currentCashRate || DEFAULT_CASH_RATE;
+    }
+
+    function updateCurrentCashRate(avgRate) {
+        currentCashRate = avgRate > 0 ? avgRate : DEFAULT_CASH_RATE;
+        const cardRateInput = document.getElementById('cardRate');
+        const hasSavedCardRate = !!localStorage.getItem('jp_last_rate');
+        if (cardRateInput && !hasSavedCardRate && (!cardRateInput.value || Number(cardRateInput.value) === DEFAULT_CASH_RATE)) {
+            cardRateInput.value = currentCashRate.toFixed(5);
+        }
+        updateRewardPlanUI();
+        recalculateAndUI();
+    }
+
     function updateRewardPlanUI() {
         const plan = getCurrentRewardPlan();
 
@@ -452,7 +478,10 @@
 
         const cashInfo = document.getElementById('cashInfo');
         if (cashInfo) {
-            cashInfo.innerHTML = `現金匯率：<strong>${CASH_RATE}</strong> | 回饋方案：<strong>${plan.label}</strong>`;
+            const cashRateLabel = exchangeRecords.length > 0
+                ? `${currentCashRate.toFixed(5)}（累積）`
+                : `${currentCashRate.toFixed(5)}（預設）`;
+            cashInfo.innerHTML = `現金匯率：<strong>${cashRateLabel}</strong> | 回饋方案：<strong>${plan.label}</strong>`;
         }
 
         const hint = document.getElementById('rewardPlanHint');
@@ -827,7 +856,7 @@
     window.calculate = function () {
         const name = document.getElementById('itemName').value || (currentInputType === 'card' ? '刷卡消費' : '現金消費');
         const jpy = parseFloat(document.getElementById('jpyPrice').value);
-        const cardRate = currentInputType === 'card' ? parseFloat(document.getElementById('cardRate').value) : CASH_RATE;
+        const cardRate = currentInputType === 'card' ? parseFloat(document.getElementById('cardRate').value) : getCashRate();
 
         if (!jpy || !cardRate) return alert('請輸入日圓金額與匯率');
 
@@ -836,13 +865,13 @@
         analysisBox.style.display = 'block';
 
         if (currentInputType === 'cash') {
-            const cashFinal = jpy * CASH_RATE;
+            const cashFinal = jpy * getCashRate();
             analysisContent.innerHTML = `
                 • 品項：${name}<br>
                 • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
                 <span class="muted">此筆為現金消費，不顯示刷卡回饋與現金比較。</span>
             `;
-            tempCalc = { name, jpy, cardRate: CASH_RATE, type: currentInputType };
+            tempCalc = { name, jpy, cardRate: getCashRate(), type: currentInputType };
         } else {
             const currentRunningBase = records.filter(r => r.id !== editingId && r.type === 'card')
                 .reduce((sum, r) => sum + (Number(r.jpy) * Number(r.cardRate)), 0);
@@ -850,7 +879,7 @@
             const reward = getCardReward(thisBase, currentRunningBase);
             const feeTwd = thisBase * BANK_FEE_RATE;
             const cardFinal = thisBase + feeTwd - reward.amount;
-            const cashFinal = jpy * CASH_RATE;
+            const cashFinal = jpy * getCashRate();
             const saved = cashFinal - cardFinal;
 
             analysisContent.innerHTML = `
@@ -888,10 +917,10 @@
                 rewardDesc = reward.desc;
                 feeTwd = thisBase * BANK_FEE_RATE;
                 finalTwdCost = thisBase + feeTwd - rewardAmount;
-                saved = (Number(r.jpy) * CASH_RATE) - finalTwdCost;
+                saved = (Number(r.jpy) * getCashRate()) - finalTwdCost;
                 runningCardBase += thisBase;
             } else {
-                finalTwdCost = Number(r.jpy) * CASH_RATE;
+                finalTwdCost = Number(r.jpy) * getCashRate();
                 rewardDesc = '現金';
             }
             return { ...r, accountingTwdCost, finalTwdCost, feeTwd, saved, rewardAmount, rewardDesc };
@@ -1091,12 +1120,29 @@
         const feeCurrency = document.getElementById('exchangeFeeCurrency').value || 'TWD';
         const note = document.getElementById('exchangeNote').value.trim();
 
-        if (!date || jpy <= 0 || twd <= 0) {
-            alert('請輸入換匯日期、取得日幣與支付台幣');
+        if (!date) {
+            alert('請輸入換匯日期');
+            return;
+        }
+        if (jpy < 0 || twd < 0 || feeAmount < 0) {
+            alert('取得日幣、支付台幣與手續費不能為負數');
+            return;
+        }
+        if (jpy === 0 && twd === 0 && feeAmount === 0) {
+            alert('請至少輸入換匯金額或手續費');
+            return;
+        }
+        if ((jpy > 0 && twd <= 0) || (twd > 0 && jpy <= 0)) {
+            alert('一般換匯請同時輸入取得日幣與支付台幣；若只記錄手續費，兩者都填 0。');
             return;
         }
 
-        const rate = manualRate > 0 ? manualRate : twd / jpy;
+        const rate = manualRate > 0 ? manualRate : (jpy > 0 && twd > 0 ? twd / jpy : 0);
+        if (feeAmount > 0 && rate <= 0) {
+            alert('有手續費時請輸入匯率，才能換算台幣 / 日幣等值。');
+            return;
+        }
+
         const feeTwd = feeCurrency === 'JPY' ? feeAmount * rate : feeAmount;
         const feeJpy = feeCurrency === 'TWD' && rate > 0 ? feeAmount / rate : feeAmount;
         const payload = {
@@ -1108,6 +1154,7 @@
             feeCurrency,
             feeTwd,
             feeJpy,
+            isFeeOnly: jpy === 0 && twd === 0 && feeAmount > 0,
             note,
             updatedBy: currentUser.uid,
             updatedByEmail: currentUser.email,
@@ -1180,7 +1227,19 @@
     };
 
     function getExchangeRate(record) {
-        return Number(record.rate || (Number(record.jpy || 0) > 0 ? Number(record.twd || 0) / Number(record.jpy || 1) : 0));
+        const savedRate = Number(record.rate || 0);
+        if (savedRate > 0) return savedRate;
+        const jpy = Number(record.jpy || 0);
+        const twd = Number(record.twd || 0);
+        return jpy > 0 && twd > 0 ? twd / jpy : 0;
+    }
+
+    function getExchangeBaseJpy(record) {
+        return Number(record.jpy || 0);
+    }
+
+    function getExchangeBaseTwd(record) {
+        return Number(record.twd || 0);
     }
 
     function getExchangeFeeTwd(record) {
@@ -1210,17 +1269,19 @@
     }
 
     function recalculateExchangeUI() {
-        const totalJpy = exchangeRecords.reduce((sum, r) => sum + Number(r.jpy || 0), 0);
-        const totalTwd = exchangeRecords.reduce((sum, r) => sum + Number(r.twd || 0), 0);
-        const totalFee = exchangeRecords.reduce((sum, r) => sum + getExchangeFeeTwd(r), 0);
+        const totalBaseJpy = exchangeRecords.reduce((sum, r) => sum + getExchangeBaseJpy(r), 0);
+        const totalBaseTwd = exchangeRecords.reduce((sum, r) => sum + getExchangeBaseTwd(r), 0);
+        const totalFeeTwd = exchangeRecords.reduce((sum, r) => sum + getExchangeFeeTwd(r), 0);
         const totalFeeJpy = exchangeRecords.reduce((sum, r) => sum + getExchangeFeeJpy(r), 0);
-        const effectiveTotalTwd = totalTwd + totalFee;
-        const avgRate = totalJpy > 0 ? effectiveTotalTwd / totalJpy : 0;
+        const effectiveTotalTwd = totalBaseTwd + totalFeeTwd;
+        const avgRate = totalBaseJpy > 0 ? effectiveTotalTwd / totalBaseJpy : 0;
 
-        document.getElementById('exchangeTotalJpy').innerText = `¥${Math.round(totalJpy).toLocaleString()}`;
+        updateCurrentCashRate(avgRate);
+
+        document.getElementById('exchangeTotalJpy').innerText = `¥${Math.round(totalBaseJpy).toLocaleString()}`;
         document.getElementById('exchangeTotalTwd').innerText = `$${Math.round(effectiveTotalTwd).toLocaleString()}`;
-        document.getElementById('exchangeAvgRate').innerText = avgRate.toFixed(5);
-        document.getElementById('exchangeTotalFee').innerHTML = `$${Math.round(totalFee).toLocaleString()}<br><small>約 ¥${Math.round(totalFeeJpy).toLocaleString()}</small>`;
+        document.getElementById('exchangeAvgRate').innerText = avgRate > 0 ? avgRate.toFixed(5) : '0.00000';
+        document.getElementById('exchangeTotalFee').innerHTML = `$${Math.round(totalFeeTwd).toLocaleString()}<br><small>約 ¥${Math.round(totalFeeJpy).toLocaleString()}</small>`;
 
         const list = document.getElementById('exchangeRecordList');
         list.innerHTML = '';
@@ -1243,8 +1304,9 @@
             const twd = Number(r.twd || 0);
             const fee = getExchangeFeeTwd(r);
             const feeText = formatExchangeFee(r);
-            const rate = Number(r.rate || (jpy > 0 ? twd / jpy : 0));
-            const effectiveRate = jpy > 0 ? (twd + fee) / jpy : 0;
+            const rate = getExchangeRate(r);
+            const effectiveRate = jpy > 0 ? (twd + fee) / jpy : rate;
+            const isFeeOnly = jpy === 0 && twd === 0 && Number(r.feeAmount || 0) > 0;
             const div = document.createElement('div');
             div.className = 'exchange-item';
             div.innerHTML = `
@@ -1252,8 +1314,8 @@
                     <div class="action-btn" style="color:var(--edit-blue)" onclick="editExchangeRecord('${r.id}')">✎</div>
                     <div class="action-btn" style="color:var(--primary)" onclick="deleteExchangeRecord('${r.id}')">✕</div>
                 </div>
-                <div class="exchange-title">${r.date || '未填日期'} <span class="tag tag-cash">💱 換匯</span></div>
-                <div class="record-amount">¥ ${Math.round(jpy).toLocaleString()} ➜ $${Math.round(twd + fee).toLocaleString()} TWD</div>
+                <div class="exchange-title">${r.date || '未填日期'} <span class="tag tag-cash">${isFeeOnly ? '💸 手續費' : '💱 換匯'}</span></div>
+                <div class="record-amount">${isFeeOnly ? '手續費紀錄' : '¥ ' + Math.round(jpy).toLocaleString() + ' ➜ $' + Math.round(twd + fee).toLocaleString() + ' TWD'}</div>
                 <div class="exchange-detail">
                     換匯匯率：${rate.toFixed(5)}<br>
                     支付台幣：$${Math.round(twd).toLocaleString()} TWD<br>
