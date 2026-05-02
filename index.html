@@ -977,7 +977,7 @@
                     <div class="action-btn" style="color:var(--primary)" onclick="deleteRecord('${r.id}')">✕</div>
                 </div>
                 <div class="record-title">${r.name} <span class="tag ${isCard ? 'tag-card' : 'tag-cash'}">${isCard ? '💳 刷卡' : '💴 現金'}</span></div>
-                <div class="record-amount">¥ ${Number(r.jpy).toLocaleString()} × ${r.cardRate} ➜ $${Math.round(r.accountingTwdCost).toLocaleString()} TWD</div>
+                <div class="record-amount">¥ ${Number(r.jpy).toLocaleString()} ➜ $${Math.round(r.accountingTwdCost).toLocaleString()} TWD</div>
                 <div class="record-detail">
                     匯率: ${r.cardRate}
                     ${isCard ? `<br>回饋方案: ${getRewardPlanByKey(getRecordRewardPlanKey(r)).label}` : ''}
