@@ -378,6 +378,16 @@
             feeRate: BANK_FEE_RATE,
             rewardDesc: '6% / 2%'
         },
+        fourPointFiveThenTwo: {
+            key: 'sixThenTwo',
+            label: '4.5% 額度 $16,000，滿額後 2%',
+            highRate: 0.045,
+            lowRate: 0.02,
+            limit: 16000,
+            unlimited: false,
+            feeRate: BANK_FEE_RATE,
+            rewardDesc: '4.5% / 2%'
+        },
         threeUnlimited: {
             key: 'threeUnlimited',
             label: '國外 3% 無上限',
@@ -395,7 +405,7 @@
             lowRate: 0.035,
             limit: Infinity,
             unlimited: true,
-            feeRate: 0,
+            feeRate: BANK_FEE_RATE,
             rewardDesc: '日本賞 3.5% 無上限'
         },
         domesticThree: {
@@ -481,12 +491,6 @@
         }, { merge: true });
     }
 
-    function updateCurrentBookInfo(name, bookId) {
-        const label = name ? `目前帳本：${name}` : '目前帳本';
-        document.getElementById('currentBookInfo').innerText = `${label}\n帳本 ID：${bookId}`;
-        document.getElementById('loginStatus').innerText = '已連線帳本';
-    }
-
     function getCurrentRewardPlan() {
         return REWARD_PLANS[currentRewardPlanKey] || REWARD_PLANS.sixThenTwo;
     }
@@ -519,13 +523,6 @@
                 ? `${currentCashRate.toFixed(5)}（累積）`
                 : `${currentCashRate.toFixed(5)}（預設）`;
             cashInfo.innerHTML = `現金匯率：<strong>${cashRateLabel}</strong> | 回饋方案：<strong>${plan.label}</strong>`;
-        }
-
-        const hint = document.getElementById('rewardPlanHint');
-        if (hint) {
-            hint.innerText = currentBookId
-                ? '目前選擇只會套用在新增或編輯當下這筆刷卡資料；歷史紀錄會保留原本方案。'
-                : '回饋方案只會套用在新增或編輯當下這筆刷卡資料。';
         }
     }
 
@@ -629,7 +626,6 @@
         editingId = null;
         tempCalc = null;
         resetForm();
-        updateCurrentBookInfo(bookName, currentBookId);
         listenBookSettings(currentBookId);
         listenRecords(currentBookId);
         listenExchangeRecords(currentBookId);
@@ -721,10 +717,6 @@
             currentBookId = bookRef.id;
             localStorage.setItem('currentBookId', currentBookId);
             await saveUserBook(currentBookId, name, 'owner');
-
-            document.getElementById('currentBookInfo').innerText =
-                `目前帳本：${name}\n帳本 ID：${currentBookId}\n\n請把這個帳本 ID 給朋友，朋友登入後輸入即可加入。`;
-            document.getElementById('loginStatus').innerText = '已連線帳本';
 
             await window.loadUserBooks();
             listenBookSettings(currentBookId);
@@ -954,7 +946,7 @@
         if (getRecordAmountMode(r) === 'twd') {
             return `$${Math.round(getRecordBaseTwd(r)).toLocaleString()} TWD`;
         }
-        return `¥ ${Number(r.jpy || 0).toLocaleString()} × ${r.cardRate} ➜ $${Math.round(getRecordBaseTwd(r)).toLocaleString()} TWD`;
+        return `¥ ${Number(r.jpy || 0).toLocaleString()} ➜ $${Math.round(getRecordBaseTwd(r)).toLocaleString()} TWD`;
     }
 
     window.calculate = function () {
@@ -975,9 +967,7 @@
                 const cashFinal = amountValue;
                 analysisContent.innerHTML = `
                     • 品項：${name}<br>
-                    • 輸入方式：只輸入台幣<br>
                     • 現金記帳金額：$${Math.round(cashFinal).toLocaleString()} TWD <br>
-                    <span class="muted">此筆為台幣金額紀錄，不需要匯率，也不顯示刷卡回饋與現金比較。</span>
                 `;
                 tempCalc = { name, amountMode: 'twd', twdAmount: amountValue, jpy: 0, cardRate: 1, type: currentInputType };
             } else {
@@ -985,7 +975,6 @@
                 analysisContent.innerHTML = `
                     • 品項：${name}<br>
                     • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
-                    <span class="muted">此筆為現金消費，不顯示刷卡回饋與現金比較。</span>
                 `;
                 tempCalc = { name, amountMode: 'jpy', jpy: amountValue, cardRate: getCashRate(), type: currentInputType };
             }
@@ -1006,13 +995,10 @@
             if (amountMode === 'twd') {
                 analysisContent.innerHTML = `
                     • 品項：${name}<br>
-                    • 輸入方式：只輸入台幣<br>
                     • 回饋方案：${getRewardPlanByKey(inputRewardPlanKey).label}<br>
-                    • 記帳金額：$${Math.round(thisBase).toLocaleString()} TWD <br>
                     • 刷卡實際成本：$${Math.round(cardFinal).toLocaleString()} TWD <br>
                     • 回饋：${reward.desc}，約 $${Math.round(reward.amount).toLocaleString()} TWD <br>
                     • 手續費：${formatCardFeeLabel(inputRewardPlanKey)}，約 $${Math.round(feeTwd).toLocaleString()} TWD <br>
-                    <span class="muted">此筆沒有日幣金額，因此不計算「比現金省多少」。</span>
                 `;
                 tempCalc = { name, amountMode: 'twd', twdAmount: amountValue, jpy: 0, cardRate: 1, type: currentInputType, rewardPlanKey: inputRewardPlanKey, rewardPlanLabel: getRewardPlanByKey(inputRewardPlanKey).label };
             } else {
@@ -1021,9 +1007,7 @@
                 analysisContent.innerHTML = `
                     • 品項：${name}<br>
                     • 回饋方案：${getRewardPlanByKey(inputRewardPlanKey).label}<br>
-                    • 記帳金額（日幣 × 刷卡匯率）：$${Math.round(thisBase).toLocaleString()} TWD <br>
                     • 刷卡實際比較成本：$${Math.round(cardFinal).toLocaleString()} TWD <br>
-                    • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
                     • 回饋：${reward.desc}，約 $${Math.round(reward.amount).toLocaleString()} TWD <br>
                     • 手續費：${formatCardFeeLabel(inputRewardPlanKey)}，約 $${Math.round(feeTwd).toLocaleString()} TWD <br>
                     <span class="${saved >= 0 ? 'better' : 'worse'}">
@@ -1125,9 +1109,7 @@
                 <div class="record-title">${r.name} <span class="tag ${isCard ? 'tag-card' : 'tag-cash'}">${isCard ? '💳 刷卡' : '💴 現金'}</span></div>
                 <div class="record-amount">${formatRecordAmountLine(r)}</div>
                 <div class="record-detail">
-                    輸入方式: ${amountMode === 'twd' ? '只輸入台幣' : '日幣 + 匯率'}
                     ${amountMode === 'jpy' ? `<br>匯率: ${r.cardRate}` : ''}
-                    ${isCard ? `<br>回饋方案: ${getRewardPlanByKey(getRecordRewardPlanKey(r)).label}` : ''}
                     ${isCard ? `<br>實際成本: $${Math.round(r.finalTwdCost).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>回饋: ${r.rewardDesc}，約 $${Math.round(r.rewardAmount).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>手續費: ${formatCardFeeLabel(getRecordRewardPlanKey(r))}，約 $${Math.round(r.feeTwd).toLocaleString()} TWD` : ''}
