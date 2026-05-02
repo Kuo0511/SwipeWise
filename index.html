@@ -79,6 +79,12 @@
         .auth-panel input { padding: 10px; font-size: 0.92em; }
         .auth-close { background: none; color: #777; padding: 6px 0 0 0; font-size: 0.8em; }
         .status-pill { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #f1f3f4; color: #555; font-size: 0.75em; margin-top: 6px; }
+
+        .book-switch-list { margin: 8px 0 10px 0; display: flex; flex-direction: column; gap: 6px; }
+        .book-switch-item { width: 100%; text-align: left; padding: 9px 10px; border-radius: 10px; background: #f6f7f9; color: #333; font-size: 0.84em; border: 1px solid #e5e7eb; }
+        .book-switch-item.active { background: #e8f5e9; border-color: var(--secondary); color: var(--secondary); }
+        .book-switch-item small { display:block; color:#777; font-weight:500; margin-top:2px; word-break:break-all; }
+        .mini-btn { padding: 8px 10px !important; font-size: 0.78em !important; border-radius: 9px !important; }
         @media (max-width: 600px) {
             body { padding-top: 58px; }
             .floating-auth { top: 8px; right: 8px; left: 8px; width: auto; }
@@ -107,6 +113,12 @@
             <label>加入朋友的帳本</label>
             <input type="text" id="joinBookId" placeholder="輸入朋友給你的 bookId">
             <button onclick="joinBook()" style="background:#2e7d32; color:white;">加入帳本</button>
+
+            <label style="margin-top:12px;">切換帳本</label>
+            <div id="bookList" class="book-switch-list">
+                <div class="muted" style="font-size:0.82em;">登入後會顯示已加入的帳本。</div>
+            </div>
+            <button class="mini-btn" onclick="loadUserBooks()" style="background:#f1f3f4; color:#555; margin-bottom:8px;">重新整理帳本清單</button>
 
             <div id="currentBookInfo" style="margin-top:10px; font-size:0.82em; color:#555; white-space:pre-wrap; word-break:break-all;"></div>
         </div>
@@ -194,6 +206,7 @@
         updateDoc,
         deleteDoc,
         getDocs,
+        getDoc,
         serverTimestamp,
         onSnapshot
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
@@ -262,6 +275,79 @@
         }
     };
 
+    async function saveUserBook(bookId, name, role) {
+        if (!currentUser || !bookId) return;
+        await setDoc(doc(db, 'userBooks', currentUser.uid, 'books', bookId), {
+            bookId,
+            name: name || '未命名帳本',
+            role: role || 'editor',
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+    }
+
+    function updateCurrentBookInfo(name, bookId) {
+        const label = name ? `目前帳本：${name}` : '目前帳本';
+        document.getElementById('currentBookInfo').innerText = `${label}\n帳本 ID：${bookId}`;
+        document.getElementById('loginStatus').innerText = '已連線帳本';
+    }
+
+    async function getBookName(bookId) {
+        try {
+            const snap = await getDoc(doc(db, 'books', bookId));
+            if (snap.exists()) return snap.data().name || '未命名帳本';
+        } catch (error) {
+            console.warn('無法讀取帳本名稱：', error);
+        }
+        return '未命名帳本';
+    }
+
+    window.loadUserBooks = async function () {
+        const bookList = document.getElementById('bookList');
+        if (!currentUser) {
+            bookList.innerHTML = '<div class="muted" style="font-size:0.82em;">請先登入 Google 帳號。</div>';
+            return;
+        }
+
+        try {
+            const snapshot = await getDocs(collection(db, 'userBooks', currentUser.uid, 'books'));
+            if (snapshot.empty) {
+                bookList.innerHTML = '<div class="muted" style="font-size:0.82em;">目前尚未建立或加入任何帳本。</div>';
+                return;
+            }
+
+            const books = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+            books.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-Hant'));
+
+            bookList.innerHTML = '';
+            books.forEach(book => {
+                const btn = document.createElement('button');
+                btn.className = `book-switch-item ${book.id === currentBookId ? 'active' : ''}`;
+                btn.innerHTML = `${book.name || '未命名帳本'} <span class="tag ${book.role === 'owner' ? 'tag-card' : 'tag-cash'}">${book.role === 'owner' ? 'owner' : 'editor'}</span><small>${book.id}</small>`;
+                btn.onclick = () => switchBook(book.id, book.name || '未命名帳本');
+                bookList.appendChild(btn);
+            });
+        } catch (error) {
+            console.error(error);
+            bookList.innerHTML = '<div class="worse" style="font-size:0.82em;">帳本清單讀取失敗，請檢查 Firestore Rules。</div>';
+        }
+    };
+
+    window.switchBook = async function (bookId, bookName) {
+        if (!currentUser) {
+            alert('請先登入 Google 帳號');
+            return;
+        }
+        currentBookId = bookId;
+        localStorage.setItem('currentBookId', currentBookId);
+        records = [];
+        editingId = null;
+        tempCalc = null;
+        resetForm();
+        updateCurrentBookInfo(bookName, currentBookId);
+        listenRecords(currentBookId);
+        await window.loadUserBooks();
+    };
+
     onAuthStateChanged(auth, (user) => {
         currentUser = user;
 
@@ -279,8 +365,10 @@
             logoutBtn.style.display = 'block';
             bookBox.style.display = 'block';
 
+            window.loadUserBooks();
+
             if (currentBookId) {
-                currentBookInfo.innerText = `目前帳本 ID：${currentBookId}`;
+                getBookName(currentBookId).then((name) => updateCurrentBookInfo(name, currentBookId));
                 listenRecords(currentBookId);
             }
         } else {
@@ -290,6 +378,7 @@
             logoutBtn.style.display = 'none';
             bookBox.style.display = 'none';
             currentBookInfo.innerText = '';
+            document.getElementById('bookList').innerHTML = '<div class="muted" style="font-size:0.82em;">登入後會顯示已加入的帳本。</div>';
 
             currentUser = null;
             records = [];
@@ -328,11 +417,13 @@
 
             currentBookId = bookRef.id;
             localStorage.setItem('currentBookId', currentBookId);
+            await saveUserBook(currentBookId, name, 'owner');
 
             document.getElementById('currentBookInfo').innerText =
                 `目前帳本：${name}\n帳本 ID：${currentBookId}\n\n請把這個帳本 ID 給朋友，朋友登入後輸入即可加入。`;
             document.getElementById('loginStatus').innerText = '已連線帳本';
 
+            await window.loadUserBooks();
             listenRecords(currentBookId);
         } catch (error) {
             console.error(error);
@@ -362,10 +453,14 @@
             currentBookId = bookId;
             localStorage.setItem('currentBookId', currentBookId);
 
+            const bookName = await getBookName(currentBookId);
+            await saveUserBook(currentBookId, bookName, 'editor');
+
             document.getElementById('currentBookInfo').innerText =
-                `已加入帳本\n帳本 ID：${currentBookId}`;
+                `已加入帳本：${bookName}\n帳本 ID：${currentBookId}`;
             document.getElementById('loginStatus').innerText = '已連線帳本';
 
+            await window.loadUserBooks();
             listenRecords(currentBookId);
         } catch (error) {
             console.error(error);
