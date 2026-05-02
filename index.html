@@ -150,7 +150,8 @@
             <select class="reward-plan-select" onchange="setRewardPlan(this.value)">
                 <option value="sixThenTwo">6% 額度 25,000，滿額後 2%</option>
                 <option value="threeUnlimited">3% 無上限</option>
-                <option value="nipponPrize">日本賞 3.5% 無上限</option>
+                <option value="nipponPrize">日本賞 3.5% 無上限（免 1.5% 手續費）</option>
+                <option value="domesticThree">國內 3% 無上限（免手續費）</option>
             </select>
             <div id="rewardPlanHint" class="reward-plan-hint">回饋方案只套用於新增或編輯當下這筆資料。</div>
         </div>
@@ -389,13 +390,23 @@
         },
         nipponPrize: {
             key: 'nipponPrize',
-            label: '日本賞 3.5% 無上限',
+            label: '日本賞 3.5% 無上限（免 1.5% 手續費）',
             highRate: 0.035,
             lowRate: 0.035,
             limit: Infinity,
             unlimited: true,
-            feeRate: BANK_FEE_RATE,
+            feeRate: 0,
             rewardDesc: '日本賞 3.5% 無上限'
+        },
+        domesticThree: {
+            key: 'domesticThree',
+            label: '國內 3% 無上限',
+            highRate: 0.03,
+            lowRate: 0.03,
+            limit: Infinity,
+            unlimited: true,
+            feeRate: 0,
+            rewardDesc: '國內 3% 無上限'
         }
     };
     let currentRewardPlanKey = localStorage.getItem('swipe_reward_plan') || 'sixThenTwo';
@@ -943,7 +954,7 @@
         if (getRecordAmountMode(r) === 'twd') {
             return `$${Math.round(getRecordBaseTwd(r)).toLocaleString()} TWD`;
         }
-        return `¥ ${Number(r.jpy || 0).toLocaleString()} ➜ $${Math.round(getRecordBaseTwd(r)).toLocaleString()} TWD`;
+        return `¥ ${Number(r.jpy || 0).toLocaleString()} × ${r.cardRate} ➜ $${Math.round(getRecordBaseTwd(r)).toLocaleString()} TWD`;
     }
 
     window.calculate = function () {
@@ -1114,11 +1125,14 @@
                 <div class="record-title">${r.name} <span class="tag ${isCard ? 'tag-card' : 'tag-cash'}">${isCard ? '💳 刷卡' : '💴 現金'}</span></div>
                 <div class="record-amount">${formatRecordAmountLine(r)}</div>
                 <div class="record-detail">
+                    輸入方式: ${amountMode === 'twd' ? '只輸入台幣' : '日幣 + 匯率'}
                     ${amountMode === 'jpy' ? `<br>匯率: ${r.cardRate}` : ''}
+                    ${isCard ? `<br>回饋方案: ${getRewardPlanByKey(getRecordRewardPlanKey(r)).label}` : ''}
                     ${isCard ? `<br>實際成本: $${Math.round(r.finalTwdCost).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>回饋: ${r.rewardDesc}，約 $${Math.round(r.rewardAmount).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>手續費: ${formatCardFeeLabel(getRecordRewardPlanKey(r))}，約 $${Math.round(r.feeTwd).toLocaleString()} TWD` : ''}
                     ${hasCashComparison ? `<br><span class="${r.saved >= 0 ? 'better' : 'worse'}">${r.saved >= 0 ? '比現金省約 $' + Math.round(r.saved).toLocaleString() : '比現金多花約 $' + Math.round(Math.abs(r.saved)).toLocaleString()}</span>` : ''}
+                    ${isCard && amountMode === 'twd' ? `<br><span class="muted">台幣輸入無日幣基準，未計算比現金省多少。</span>` : ''}
                     ${r.createdByEmail ? `<br><span class="muted">建立者：${r.createdByEmail}</span>` : ''}
                 </div>
             `;
