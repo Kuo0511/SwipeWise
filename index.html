@@ -150,6 +150,7 @@
             <select class="reward-plan-select" onchange="setRewardPlan(this.value)">
                 <option value="sixThenTwo">6% 額度 25,000，滿額後 2%</option>
                 <option value="threeUnlimited">3% 無上限</option>
+                <option value="nipponPrize">日本賞 3.5% 無上限（免 1.5% 手續費）</option>
             </select>
             <div id="rewardPlanHint" class="reward-plan-hint">回饋方案只套用於新增或編輯當下這筆資料。</div>
         </div>
@@ -372,7 +373,9 @@
             highRate: 0.06,
             lowRate: 0.02,
             limit: 25000,
-            unlimited: false
+            unlimited: false,
+            feeRate: BANK_FEE_RATE,
+            rewardDesc: '6% / 2%'
         },
         threeUnlimited: {
             key: 'threeUnlimited',
@@ -380,7 +383,19 @@
             highRate: 0.03,
             lowRate: 0.03,
             limit: Infinity,
-            unlimited: true
+            unlimited: true,
+            feeRate: BANK_FEE_RATE,
+            rewardDesc: '3% 無上限'
+        },
+        nipponPrize: {
+            key: 'nipponPrize',
+            label: '日本賞 3.5% 無上限（免 1.5% 手續費）',
+            highRate: 0.035,
+            lowRate: 0.035,
+            limit: Infinity,
+            unlimited: true,
+            feeRate: 0,
+            rewardDesc: '日本賞 3.5% 無上限'
         }
     };
     let currentRewardPlanKey = localStorage.getItem('swipe_reward_plan') || 'sixThenTwo';
@@ -875,13 +890,28 @@
         return record?.rewardPlanKey || 'sixThenTwo';
     }
 
+    function getCardFeeRate(planKey = currentRewardPlanKey) {
+        const plan = getRewardPlanByKey(planKey);
+        return Number(plan.feeRate ?? BANK_FEE_RATE);
+    }
+
+    function formatPercent(rate) {
+        const pct = rate * 100;
+        return Number.isInteger(pct) ? `${pct}%` : `${pct.toFixed(1)}%`;
+    }
+
+    function formatCardFeeLabel(planKey = currentRewardPlanKey) {
+        const feeRate = getCardFeeRate(planKey);
+        return feeRate === 0 ? '0%，免手續費' : `${formatPercent(feeRate)}`;
+    }
+
     function getCardReward(base, runningBase, planKey = currentRewardPlanKey) {
         const plan = getRewardPlanByKey(planKey);
 
         if (plan.unlimited) {
             return {
                 amount: base * plan.highRate,
-                desc: '3% 無上限'
+                desc: plan.rewardDesc || `${formatPercent(plan.highRate)} 無上限`
             };
         }
 
@@ -959,7 +989,7 @@
 
             const thisBase = amountMode === 'twd' ? amountValue : amountValue * cardRate;
             const reward = getCardReward(thisBase, currentRunningBase, inputRewardPlanKey);
-            const feeTwd = thisBase * BANK_FEE_RATE;
+            const feeTwd = thisBase * getCardFeeRate(inputRewardPlanKey);
             const cardFinal = thisBase + feeTwd - reward.amount;
 
             if (amountMode === 'twd') {
@@ -970,7 +1000,7 @@
                     • 記帳金額：$${Math.round(thisBase).toLocaleString()} TWD <br>
                     • 刷卡實際成本：$${Math.round(cardFinal).toLocaleString()} TWD <br>
                     • 回饋：${reward.desc}，約 $${Math.round(reward.amount).toLocaleString()} TWD <br>
-                    • 手續費：1.5%，約 $${Math.round(feeTwd).toLocaleString()} TWD <br>
+                    • 手續費：${formatCardFeeLabel(inputRewardPlanKey)}，約 $${Math.round(feeTwd).toLocaleString()} TWD <br>
                     <span class="muted">此筆沒有日幣金額，因此不計算「比現金省多少」。</span>
                 `;
                 tempCalc = { name, amountMode: 'twd', twdAmount: amountValue, jpy: 0, cardRate: 1, type: currentInputType, rewardPlanKey: inputRewardPlanKey, rewardPlanLabel: getRewardPlanByKey(inputRewardPlanKey).label };
@@ -984,7 +1014,7 @@
                     • 刷卡實際比較成本：$${Math.round(cardFinal).toLocaleString()} TWD <br>
                     • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
                     • 回饋：${reward.desc}，約 $${Math.round(reward.amount).toLocaleString()} TWD <br>
-                    • 手續費：1.5%，約 $${Math.round(feeTwd).toLocaleString()} TWD <br>
+                    • 手續費：${formatCardFeeLabel(inputRewardPlanKey)}，約 $${Math.round(feeTwd).toLocaleString()} TWD <br>
                     <span class="${saved >= 0 ? 'better' : 'worse'}">
                         ➔ ${saved >= 0 ? '刷卡比現金省約 $' + Math.round(saved).toLocaleString() : '刷卡比現金多花約 $' + Math.round(Math.abs(saved)).toLocaleString()}
                     </span>
@@ -1016,7 +1046,7 @@
                 const reward = getCardReward(thisBase, runningBaseForPlan, recordPlanKey);
                 rewardAmount = reward.amount;
                 rewardDesc = reward.desc;
-                feeTwd = thisBase * BANK_FEE_RATE;
+                feeTwd = thisBase * getCardFeeRate(recordPlanKey);
                 finalTwdCost = thisBase + feeTwd - rewardAmount;
 
                 if (amountMode === 'jpy') {
@@ -1050,7 +1080,7 @@
         const plan = getCurrentRewardPlan();
         if (plan.unlimited) {
             document.getElementById('progressBar').style.width = '100%';
-            document.getElementById('progressText').innerText = `$${Math.round(selectedPlanRunningBase).toLocaleString()} / 無上限（3%）`;
+            document.getElementById('progressText').innerText = `$${Math.round(selectedPlanRunningBase).toLocaleString()} / 無上限（${plan.label}）`;
         } else {
             const progress = Math.min((selectedPlanRunningBase / plan.limit) * 100, 100);
             document.getElementById('progressBar').style.width = progress + '%';
@@ -1089,7 +1119,7 @@
                     ${isCard ? `<br>回饋方案: ${getRewardPlanByKey(getRecordRewardPlanKey(r)).label}` : ''}
                     ${isCard ? `<br>實際成本: $${Math.round(r.finalTwdCost).toLocaleString()} TWD` : ''}
                     ${isCard ? `<br>回饋: ${r.rewardDesc}，約 $${Math.round(r.rewardAmount).toLocaleString()} TWD` : ''}
-                    ${isCard ? `<br>手續費: 1.5%，約 $${Math.round(r.feeTwd).toLocaleString()} TWD` : ''}
+                    ${isCard ? `<br>手續費: ${formatCardFeeLabel(getRecordRewardPlanKey(r))}，約 $${Math.round(r.feeTwd).toLocaleString()} TWD` : ''}
                     ${hasCashComparison ? `<br><span class="${r.saved >= 0 ? 'better' : 'worse'}">${r.saved >= 0 ? '比現金省約 $' + Math.round(r.saved).toLocaleString() : '比現金多花約 $' + Math.round(Math.abs(r.saved)).toLocaleString()}</span>` : ''}
                     ${isCard && amountMode === 'twd' ? `<br><span class="muted">台幣輸入無日幣基準，未計算比現金省多少。</span>` : ''}
                     ${r.createdByEmail ? `<br><span class="muted">建立者：${r.createdByEmail}</span>` : ''}
