@@ -271,16 +271,19 @@
             </div>
             <div class="exchange-form-grid">
                 <div>
-                    <label>提領 / 換匯手續費</label>
-                    <input type="number" id="exchangeFee" placeholder="沒有則填 0" value="0">
+                    <label>手續費金額</label>
+                    <input type="number" id="exchangeFee" placeholder="單獨輸入，沒有則填 0" value="0">
                 </div>
                 <div>
-                    <label>手續費幣別</label>
+                    <label>手續費輸入單位</label>
                     <select id="exchangeFeeCurrency">
-                        <option value="TWD">台幣 TWD</option>
-                        <option value="JPY">日幣 JPY</option>
+                        <option value="TWD">以台幣輸入</option>
+                        <option value="JPY">以日幣輸入</option>
                     </select>
                 </div>
+            </div>
+            <div class="muted" style="font-size:0.75em; margin:-4px 0 10px; line-height:1.5;">
+                手續費為獨立欄位，不需要併入「取得日幣」或「支付台幣」。若以台幣輸入，系統會用 手續費 ÷ 匯率 換算日幣等值；若以日幣輸入，系統會用 手續費 × 匯率 換算台幣等值。
             </div>
             <label>備註</label>
             <input type="text" id="exchangeNote" placeholder="例如：機場 ATM、銀行換匯、便利商店 ATM">
@@ -291,7 +294,7 @@
             <div class="summary-item"><div>累積日幣</div><span id="exchangeTotalJpy">¥0</span></div>
             <div class="summary-item"><div>累積台幣成本</div><span id="exchangeTotalTwd">$0</span></div>
             <div class="summary-item"><div>累積平均匯率</div><span id="exchangeAvgRate">0.00000</span></div>
-            <div class="summary-item"><div>累積手續費<br><small style="opacity:.75;">TWD 等值</small></div><span id="exchangeTotalFee">$0</span></div>
+            <div class="summary-item"><div>累積手續費<br><small style="opacity:.75;">TWD / JPY 等值</small></div><span id="exchangeTotalFee">$0<br><small>約 ¥0</small></span></div>
         </div>
 
         <div class="exchange-list-title">換匯紀錄</div>
@@ -1092,6 +1095,7 @@
 
         const rate = manualRate > 0 ? manualRate : twd / jpy;
         const feeTwd = feeCurrency === 'JPY' ? feeAmount * rate : feeAmount;
+        const feeJpy = feeCurrency === 'TWD' && rate > 0 ? feeAmount / rate : feeAmount;
         const payload = {
             date,
             jpy,
@@ -1100,6 +1104,7 @@
             feeAmount,
             feeCurrency,
             feeTwd,
+            feeJpy,
             note,
             updatedBy: currentUser.uid,
             updatedByEmail: currentUser.email,
@@ -1171,34 +1176,48 @@
         }
     };
 
+    function getExchangeRate(record) {
+        return Number(record.rate || (Number(record.jpy || 0) > 0 ? Number(record.twd || 0) / Number(record.jpy || 1) : 0));
+    }
+
     function getExchangeFeeTwd(record) {
         const feeCurrency = record.feeCurrency || 'TWD';
         const feeAmount = Number(record.feeAmount ?? record.feeTwd ?? 0);
-        const rate = Number(record.rate || (Number(record.jpy || 0) > 0 ? Number(record.twd || 0) / Number(record.jpy || 1) : 0));
+        const rate = getExchangeRate(record);
         return feeCurrency === 'JPY' ? feeAmount * rate : feeAmount;
+    }
+
+    function getExchangeFeeJpy(record) {
+        const feeCurrency = record.feeCurrency || 'TWD';
+        const feeAmount = Number(record.feeAmount ?? record.feeTwd ?? 0);
+        const rate = getExchangeRate(record);
+        if (feeCurrency === 'JPY') return feeAmount;
+        return rate > 0 ? feeAmount / rate : 0;
     }
 
     function formatExchangeFee(record) {
         const feeCurrency = record.feeCurrency || 'TWD';
         const feeAmount = Number(record.feeAmount ?? record.feeTwd ?? 0);
         const feeTwd = getExchangeFeeTwd(record);
+        const feeJpy = getExchangeFeeJpy(record);
         if (feeCurrency === 'JPY') {
-            return `¥${Math.round(feeAmount).toLocaleString()} JPY，約 $${Math.round(feeTwd).toLocaleString()} TWD`;
+            return `¥${Math.round(feeAmount).toLocaleString()} JPY（約 $${Math.round(feeTwd).toLocaleString()} TWD）`;
         }
-        return `$${Math.round(feeAmount).toLocaleString()} TWD`;
+        return `$${Math.round(feeAmount).toLocaleString()} TWD（約 ¥${Math.round(feeJpy).toLocaleString()} JPY）`;
     }
 
     function recalculateExchangeUI() {
         const totalJpy = exchangeRecords.reduce((sum, r) => sum + Number(r.jpy || 0), 0);
         const totalTwd = exchangeRecords.reduce((sum, r) => sum + Number(r.twd || 0), 0);
         const totalFee = exchangeRecords.reduce((sum, r) => sum + getExchangeFeeTwd(r), 0);
+        const totalFeeJpy = exchangeRecords.reduce((sum, r) => sum + getExchangeFeeJpy(r), 0);
         const effectiveTotalTwd = totalTwd + totalFee;
         const avgRate = totalJpy > 0 ? effectiveTotalTwd / totalJpy : 0;
 
         document.getElementById('exchangeTotalJpy').innerText = `¥${Math.round(totalJpy).toLocaleString()}`;
         document.getElementById('exchangeTotalTwd').innerText = `$${Math.round(effectiveTotalTwd).toLocaleString()}`;
         document.getElementById('exchangeAvgRate').innerText = avgRate.toFixed(5);
-        document.getElementById('exchangeTotalFee').innerText = `$${Math.round(totalFee).toLocaleString()}`;
+        document.getElementById('exchangeTotalFee').innerHTML = `$${Math.round(totalFee).toLocaleString()}<br><small>約 ¥${Math.round(totalFeeJpy).toLocaleString()}</small>`;
 
         const list = document.getElementById('exchangeRecordList');
         list.innerHTML = '';
@@ -1235,7 +1254,7 @@
                 <div class="exchange-detail">
                     換匯匯率：${rate.toFixed(5)}<br>
                     支付台幣：$${Math.round(twd).toLocaleString()} TWD<br>
-                    提領 / 換匯手續費：${feeText}<br>
+                    手續費：${feeText}<br>
                     含手續費有效匯率：${effectiveRate.toFixed(5)}
                     ${r.note ? `<br>備註：${r.note}` : ''}
                     ${r.createdByEmail ? `<br><span class="muted">建立者：${r.createdByEmail}</span>` : ''}
