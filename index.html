@@ -1,0 +1,630 @@
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swipe Wise Firebase 共用帳本版</title>
+    <style>
+        :root {
+            --primary: #d32f2f;
+            --secondary: #2e7d32;
+            --accent: #673ab7;
+            --cash-gold: #fbc02d;
+            --edit-blue: #1976d2;
+            --bg: #f2f4f7;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; }
+        .container { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 500px; width: 100%; }
+        h2 { text-align: center; color: var(--primary); margin-bottom: 5px; }
+        .cash-info { text-align: center; font-size: 0.85em; color: #666; margin-bottom: 15px; background: #fff3e0; padding: 6px; border-radius: 10px; }
+        .card { background: #ffffff; border: 1px solid #eee; border-radius: 15px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+
+        .type-selector { display: flex; gap: 8px; margin-bottom: 15px; }
+        .type-btn { flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 10px; text-align: center; cursor: pointer; font-weight: bold; background: white; font-size: 0.9em; }
+        .type-btn.active[data-type="card"] { border-color: var(--secondary); color: var(--secondary); background: #e8f5e9; }
+        .type-btn.active[data-type="cash"] { border-color: var(--cash-gold); color: #c7980b; background: #fffde7; }
+        .type-btn.active[data-view="all"] { border-color: #333; color: white; background: #333; }
+        .type-btn.active[data-view="card"] { border-color: #333; color: white; background: #333; }
+        .type-btn.active[data-view="cash"] { border-color: #333; color: white; background: #333; }
+
+
+        label { display: block; margin-bottom: 4px; font-weight: bold; font-size: 0.85em; color: #444; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 1em; margin-bottom: 10px; }
+
+        button { width: 100%; padding: 15px; border: none; border-radius: 10px; font-size: 1.1em; font-weight: bold; cursor: pointer; }
+        .btn-calc { background-color: var(--primary); color: white; }
+        .btn-add { background-color: var(--secondary); color: white; margin-top: 10px; display: none; }
+
+        #analysisBox {
+            display: none; background: #fdfdfd; border: 2px dashed #ddd; border-radius: 12px;
+            padding: 12px; margin-top: 15px; font-size: 0.9em; line-height: 1.6;
+        }
+        .better { color: var(--secondary); font-weight: bold; }
+        .worse { color: var(--primary); font-weight: bold; }
+        .muted { color: #777; }
+
+        .progress-container { margin-bottom: 20px; font-size: 0.8em; color: #555; }
+        .progress-bar-bg { background: #ddd; height: 10px; border-radius: 5px; margin-top: 5px; overflow: hidden; }
+        .progress-bar-fill { background: var(--secondary); height: 100%; width: 0%; transition: width 0.3s; }
+
+        .record-item { background: white; padding: 12px 15px; border-radius: 12px; margin-bottom: 10px; border-left: 5px solid #ccc; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .record-card { border-left-color: var(--secondary); }
+        .record-cash { border-left-color: var(--cash-gold); }
+        .record-title { padding-right: 56px; font-weight: 800; margin-bottom: 5px; }
+        .record-amount { font-size: 0.9em; margin-bottom: 4px; }
+        .record-detail { font-size: 0.75em; color: #777; line-height: 1.6; }
+
+        .action-group { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
+        .action-btn { background: #eee; border-radius: 5px; padding: 4px 6px; font-size: 0.7em; font-weight: bold; cursor: pointer; }
+
+        .summary-banner { background: #2c3e50; color: white; padding: 15px; border-radius: 15px; margin: 15px 0; display: flex; flex-direction: column; gap: 10px; }
+        .summary-row { display: flex; justify-content: space-around; align-items: center; width: 100%; }
+        .summary-item { text-align: center; }
+        .summary-item div { font-size: 0.75em; opacity: 0.8; }
+        .summary-item span { font-size: 1.2em; font-weight: 800; }
+
+        .tag { font-size: 0.65em; padding: 2px 4px; border-radius: 3px; font-weight: bold; }
+        .tag-card { background: #e8f5e9; color: #2e7d32; }
+        .tag-cash { background: #fffde7; color: #a67c00; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 style="color: #333;">Swipe Wise</h2>
+    
+    <div class="cash-info">現金匯率：<strong>0.19882</strong> | 6% 額度：<strong>$25,000</strong></div>
+
+    <div class="card" id="authCard">
+        <div id="userInfo" style="font-size:0.9em; margin-bottom:10px; color:#555;">尚未登入</div>
+        <button id="loginBtn" onclick="loginWithGoogle()" style="background:#4285f4; color:white;">使用 Google 登入</button>
+        <button id="logoutBtn" onclick="logout()" style="display:none; background:#777; color:white;">登出</button>
+    </div>
+
+    <div class="card" id="bookBox" style="display:none;">
+        <label>建立新帳本</label>
+        <input type="text" id="bookName" placeholder="例如：東京旅遊記帳">
+        <button onclick="createBook()" style="background:#673ab7; color:white; margin-bottom:10px;">建立共用帳本</button>
+
+        <label>加入朋友的帳本</label>
+        <input type="text" id="joinBookId" placeholder="輸入朋友給你的 bookId">
+        <button onclick="joinBook()" style="background:#2e7d32; color:white;">加入帳本</button>
+
+        <div id="currentBookInfo" style="margin-top:10px; font-size:0.85em; color:#555; white-space:pre-wrap;"></div>
+    </div>
+
+    <div class="card" style="background: #f8f9fa;">
+        <label>支付方式</label>
+        <div class="type-selector">
+            <div class="type-btn active" data-type="card" onclick="setType('card')">💳 刷卡</div>
+            <div class="type-btn" data-type="cash" onclick="setType('cash')">💴 現金</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <label>消費品項</label>
+        <input type="text" id="itemName" placeholder="例如：藥妝、壽司" oninput="hideAnalysis()">
+        <label>商品金額 (JPY)</label>
+        <input type="number" id="jpyPrice" placeholder="0" oninput="hideAnalysis()">
+
+        <div id="cardFields">
+            <label>刷卡匯率 (或從助手推算)</label>
+            <div style="display:flex; gap:5px; margin-bottom:10px;">
+                <input type="number" id="cardRate" step="0.00001" style="margin-bottom:0;" oninput="hideAnalysis()">
+                <button onclick="autoCalcRate()" style="width: auto; padding: 0 15px; background: #ffbece; color: rgb(114, 60, 60); font-size: 0.8em; white-space: nowrap; display: flex; align-items: center; justify-content: center;">匯率助手</button>    
+            </div>
+            <div id="helperBox" style="display:none; padding:10px; background:#f3e5f5; border-radius:8px; margin-bottom:10px;">
+                <label style="color:var(--accent)">匯率助手：輸入台幣</label>
+                <input type="number" id="helperTwd" placeholder="台幣金額" oninput="autoCalcRate()">
+            </div>
+        </div>
+
+        <button class="btn-calc" id="mainBtn" onclick="calculate()" style="background-color: #f58559; ">分析此筆交易</button>
+
+        <div id="analysisBox">
+            <strong>📊 交易分析報告：</strong><div id="analysisContent"></div>
+        </div>
+
+        <button id="addBtn" class="btn-add" onclick="addOrUpdateRecord()"></button>
+    </div>
+
+    <div class="type-selector">
+        <div class="type-btn active" data-view="all" onclick="setView('all')">顯示全部</div>
+        <div class="type-btn" data-view="card" onclick="setView('card')">僅刷卡</div>
+        <div class="type-btn" data-view="cash" onclick="setView('cash')">僅現金</div>
+    </div>
+
+    <div class="summary-banner">
+        <div class="summary-row">
+            <div class="summary-item"><div>實付總額 (TWD)</div><span id="sumTotal">0</span></div>
+            <div class="summary-item" id="sumSavedBox"><div>刷卡共省 (TWD)</div><span id="sumSaved" style="color: #ffeb3b;">0</span></div>
+        </div>
+    </div>
+
+    <div class="progress-container">
+        刷卡回饋進度: <span id="progressText">$0 / $25,000</span>
+        <div class="progress-bar-bg"><div id="progressBar" class="progress-bar-fill"></div></div>
+    </div>
+
+    <div id="recordList"></div>
+    <button onclick="clearAll()" style="background:none; border:none; color:#999; font-size:0.8em; margin:20px 0; width:100%;">清除所有紀錄</button>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import {
+        getAuth,
+        GoogleAuthProvider,
+        signInWithPopup,
+        signOut,
+        onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+    import {
+        getFirestore,
+        collection,
+        doc,
+        addDoc,
+        setDoc,
+        updateDoc,
+        deleteDoc,
+        getDocs,
+        serverTimestamp,
+        onSnapshot
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+    // TODO：請到 Firebase Console 複製你的 firebaseConfig，貼到下面取代這些值。
+    const firebaseConfig = {
+        apiKey: "AIzaSyB78JxIcKrLADuiGaqXuUC_Ffog3OUFP2g",
+        authDomain: "swipewise-tokyo202606.firebaseapp.com",
+        projectId: "swipewise-tokyo202606",
+        storageBucket: "swipewise-tokyo202606.firebasestorage.app",
+        messagingSenderId: "868498902901",
+        appId: "1:868498902901:web:8e3ab72758955bcf1ecd3c",
+        measurementId: "G-B7R1CH4STT"
+    };
+
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const CASH_RATE = 0.19882;
+    const BANK_FEE_RATE = 0.015;
+    const REWARD_LIMIT = 25000;
+    const HIGH_REWARD = 0.06;
+    const LOW_REWARD = 0.02;
+
+    let currentInputType = 'card';
+    let currentView = 'all';
+    let editingId = null;
+    let tempCalc = null;
+    let records = [];
+
+    let currentUser = null;
+    let currentBookId = localStorage.getItem('currentBookId') || null;
+    let unsubscribeRecords = null;
+
+    document.getElementById('cardRate').value = localStorage.getItem('jp_last_rate') || 0.19882;
+    recalculateAndUI();
+
+    window.loginWithGoogle = async function () {
+        try {
+            const provider = new GoogleAuthProvider();
+            await signInWithPopup(auth, provider);
+        } catch (error) {
+            console.error(error);
+            alert('Google 登入失敗：' + error.message);
+        }
+    };
+
+    window.logout = async function () {
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.error(error);
+            alert('登出失敗：' + error.message);
+        }
+    };
+
+    onAuthStateChanged(auth, (user) => {
+        currentUser = user;
+
+        const userInfo = document.getElementById('userInfo');
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const bookBox = document.getElementById('bookBox');
+        const currentBookInfo = document.getElementById('currentBookInfo');
+
+        if (user) {
+            userInfo.innerText = `目前登入：${user.email}`;
+            loginBtn.style.display = 'none';
+            logoutBtn.style.display = 'block';
+            bookBox.style.display = 'block';
+
+            if (currentBookId) {
+                currentBookInfo.innerText = `目前帳本 ID：${currentBookId}`;
+                listenRecords(currentBookId);
+            }
+        } else {
+            userInfo.innerText = '尚未登入';
+            loginBtn.style.display = 'block';
+            logoutBtn.style.display = 'none';
+            bookBox.style.display = 'none';
+            currentBookInfo.innerText = '';
+
+            currentUser = null;
+            records = [];
+            editingId = null;
+            tempCalc = null;
+
+            if (unsubscribeRecords) {
+                unsubscribeRecords();
+                unsubscribeRecords = null;
+            }
+
+            recalculateAndUI();
+        }
+    });
+
+    window.createBook = async function () {
+        if (!currentUser) {
+            alert('請先登入 Google 帳號');
+            return;
+        }
+
+        const name = document.getElementById('bookName').value.trim() || '未命名帳本';
+
+        try {
+            const bookRef = await addDoc(collection(db, 'books'), {
+                name,
+                ownerUid: currentUser.uid,
+                createdAt: serverTimestamp()
+            });
+
+            await setDoc(doc(db, 'books', bookRef.id, 'members', currentUser.uid), {
+                email: currentUser.email,
+                role: 'owner',
+                joinedAt: serverTimestamp()
+            });
+
+            currentBookId = bookRef.id;
+            localStorage.setItem('currentBookId', currentBookId);
+
+            document.getElementById('currentBookInfo').innerText =
+                `目前帳本：${name}\n帳本 ID：${currentBookId}\n\n請把這個帳本 ID 給朋友，朋友登入後輸入即可加入。`;
+
+            listenRecords(currentBookId);
+        } catch (error) {
+            console.error(error);
+            alert('建立帳本失敗：' + error.message);
+        }
+    };
+
+    window.joinBook = async function () {
+        if (!currentUser) {
+            alert('請先登入 Google 帳號');
+            return;
+        }
+
+        const bookId = document.getElementById('joinBookId').value.trim();
+        if (!bookId) {
+            alert('請輸入帳本 ID');
+            return;
+        }
+
+        try {
+            await setDoc(doc(db, 'books', bookId, 'members', currentUser.uid), {
+                email: currentUser.email,
+                role: 'editor',
+                joinedAt: serverTimestamp()
+            });
+
+            currentBookId = bookId;
+            localStorage.setItem('currentBookId', currentBookId);
+
+            document.getElementById('currentBookInfo').innerText =
+                `已加入帳本\n帳本 ID：${currentBookId}`;
+
+            listenRecords(currentBookId);
+        } catch (error) {
+            console.error(error);
+            alert('加入帳本失敗：' + error.message);
+        }
+    };
+
+    function listenRecords(bookId) {
+        if (unsubscribeRecords) {
+            unsubscribeRecords();
+            unsubscribeRecords = null;
+        }
+
+        const recordsRef = collection(db, 'books', bookId, 'records');
+        unsubscribeRecords = onSnapshot(recordsRef, (snapshot) => {
+            records = snapshot.docs.map((docSnap) => ({
+                id: docSnap.id,
+                ...docSnap.data()
+            }));
+
+            records.sort((a, b) => {
+                const ta = a.createdAt?.seconds || 0;
+                const tb = b.createdAt?.seconds || 0;
+                return tb - ta;
+            });
+
+            recalculateAndUI();
+        }, (error) => {
+            console.error(error);
+            alert('讀取帳本資料失敗：' + error.message);
+        });
+    }
+
+    window.setType = function (type) {
+        currentInputType = type;
+        document.querySelectorAll('.type-btn[data-type]').forEach(btn => btn.classList.toggle('active', btn.dataset.type === type));
+        document.getElementById('cardFields').style.display = type === 'card' ? 'block' : 'none';
+        hideAnalysis();
+    };
+
+    window.setView = function (view) {
+        currentView = view;
+        document.querySelectorAll('.type-btn[data-view]').forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
+        recalculateAndUI();
+    };
+
+    window.autoCalcRate = function () {
+        const jpy = parseFloat(document.getElementById('jpyPrice').value);
+        const twd = parseFloat(document.getElementById('helperTwd').value);
+        const hBox = document.getElementById('helperBox');
+        if (hBox.style.display === 'none') { hBox.style.display = 'block'; return; }
+        if (jpy > 0 && twd > 0) {
+            const rate = (twd / jpy).toFixed(5);
+            document.getElementById('cardRate').value = rate;
+            hideAnalysis();
+        }
+    };
+
+    window.hideAnalysis = function () {
+        document.getElementById('analysisBox').style.display = 'none';
+        document.getElementById('addBtn').style.display = 'none';
+    };
+
+    function hideAnalysis() {
+        window.hideAnalysis();
+    }
+
+    function getCardReward(base, runningBase) {
+        if (runningBase >= REWARD_LIMIT) {
+            return { amount: base * LOW_REWARD, desc: '2%' };
+        }
+        if (runningBase + base <= REWARD_LIMIT) {
+            return { amount: base * HIGH_REWARD, desc: '6%' };
+        }
+
+        const highRewardBase = REWARD_LIMIT - runningBase;
+        const lowRewardBase = base - highRewardBase;
+        return {
+            amount: (highRewardBase * HIGH_REWARD) + (lowRewardBase * LOW_REWARD),
+            desc: '分段 6% / 2%'
+        };
+    }
+
+    window.calculate = function () {
+        const name = document.getElementById('itemName').value || (currentInputType === 'card' ? '刷卡消費' : '現金消費');
+        const jpy = parseFloat(document.getElementById('jpyPrice').value);
+        const cardRate = currentInputType === 'card' ? parseFloat(document.getElementById('cardRate').value) : CASH_RATE;
+
+        if (!jpy || !cardRate) return alert('請輸入日圓金額與匯率');
+
+        const analysisBox = document.getElementById('analysisBox');
+        const analysisContent = document.getElementById('analysisContent');
+        analysisBox.style.display = 'block';
+
+        if (currentInputType === 'cash') {
+            const cashFinal = jpy * CASH_RATE;
+            analysisContent.innerHTML = `
+                • 品項：${name}<br>
+                • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
+                <span class="muted">此筆為現金消費，不顯示刷卡回饋與現金比較。</span>
+            `;
+            tempCalc = { name, jpy, cardRate: CASH_RATE, type: currentInputType };
+        } else {
+            const currentRunningBase = records.filter(r => r.id !== editingId && r.type === 'card')
+                .reduce((sum, r) => sum + (Number(r.jpy) * Number(r.cardRate)), 0);
+            const thisBase = jpy * cardRate;
+            const reward = getCardReward(thisBase, currentRunningBase);
+            const feeTwd = thisBase * BANK_FEE_RATE;
+            const cardFinal = thisBase + feeTwd - reward.amount;
+            const cashFinal = jpy * CASH_RATE;
+            const saved = cashFinal - cardFinal;
+
+            analysisContent.innerHTML = `
+                • 品項：${name}<br>
+                • 刷卡估計實付：$${Math.round(cardFinal).toLocaleString()} TWD <br>
+                • 現金估計實付：$${Math.round(cashFinal).toLocaleString()} TWD <br>
+                • 回饋：${reward.desc}，約 $${Math.round(reward.amount).toLocaleString()} TWD <br>
+                • 手續費：1.5%，約 $${Math.round(feeTwd).toLocaleString()} TWD <br>
+                <span class="${saved >= 0 ? 'better' : 'worse'}">
+                    ➔ ${saved >= 0 ? '刷卡比現金省約 $' + Math.round(saved).toLocaleString() : '刷卡比現金多花約 $' + Math.round(Math.abs(saved)).toLocaleString()}
+                </span>
+            `;
+            tempCalc = { name, jpy, cardRate, type: currentInputType };
+            localStorage.setItem('jp_last_rate', cardRate);
+        }
+
+        const addBtn = document.getElementById('addBtn');
+        addBtn.style.display = 'block';
+        addBtn.innerText = editingId ? '💾 更新這筆紀錄' : '➕ 存入紀錄';
+    };
+
+    function recalculateAndUI() {
+        let runningCardBase = 0;
+        let sorted = [...records].reverse();
+
+        sorted = sorted.map(r => {
+            let finalTwdCost, feeTwd = 0, saved = 0, rewardAmount = 0, rewardDesc = '';
+            const thisBase = Number(r.jpy) * Number(r.cardRate);
+            if (r.type === 'card') {
+                const reward = getCardReward(thisBase, runningCardBase);
+                rewardAmount = reward.amount;
+                rewardDesc = reward.desc;
+                feeTwd = thisBase * BANK_FEE_RATE;
+                finalTwdCost = thisBase + feeTwd - rewardAmount;
+                saved = (Number(r.jpy) * CASH_RATE) - finalTwdCost;
+                runningCardBase += thisBase;
+            } else {
+                finalTwdCost = Number(r.jpy) * CASH_RATE;
+                rewardDesc = '現金';
+            }
+            return { ...r, finalTwdCost, feeTwd, saved, rewardAmount, rewardDesc };
+        });
+
+        records = sorted.reverse();
+
+        let filterRecords = records;
+        if(currentView === 'card') filterRecords = records.filter(r => r.type === 'card');
+        if(currentView === 'cash') filterRecords = records.filter(r => r.type === 'cash');
+
+        let totalTwd = 0, totalSaved = 0;
+        filterRecords.forEach(r => { totalTwd += r.finalTwdCost || 0; totalSaved += (r.saved || 0); });
+        document.getElementById('sumTotal').innerText = Math.round(totalTwd).toLocaleString();
+        document.getElementById('sumSaved').innerText = Math.round(totalSaved).toLocaleString();
+        document.getElementById('sumSavedBox').style.display = currentView === 'cash' ? 'none' : 'block';
+
+        const progress = Math.min((runningCardBase / REWARD_LIMIT) * 100, 100);
+        document.getElementById('progressBar').style.width = progress + '%';
+        document.getElementById('progressText').innerText = `$${Math.round(runningCardBase).toLocaleString()} / $25,000`;
+
+        const list = document.getElementById('recordList');
+        list.innerHTML = '';
+
+        if (currentUser && !currentBookId) {
+            list.innerHTML = '<div class="muted" style="text-align:center; padding:15px;">請先建立或加入帳本。</div>';
+            return;
+        }
+
+        if (!currentUser) {
+            list.innerHTML = '<div class="muted" style="text-align:center; padding:15px;">請先登入 Google 帳號。</div>';
+            return;
+        }
+
+        filterRecords.forEach(r => {
+            const isCard = r.type === 'card';
+            const div = document.createElement('div');
+            div.className = `record-item ${isCard ? 'record-card' : 'record-cash'}`;
+            div.innerHTML = `
+                <div class="action-group">
+                    <div class="action-btn" style="color:var(--edit-blue)" onclick="editRecord('${r.id}')">✎</div>
+                    <div class="action-btn" style="color:var(--primary)" onclick="deleteRecord('${r.id}')">✕</div>
+                </div>
+                <div class="record-title">${r.name} <span class="tag ${isCard ? 'tag-card' : 'tag-cash'}">${isCard ? '💳 刷卡' : '💴 現金'}</span></div>
+                <div class="record-amount">¥ ${Number(r.jpy).toLocaleString()} ➜ $${Math.round(r.finalTwdCost).toLocaleString()} TWD</div>
+                <div class="record-detail">
+                    匯率: ${r.cardRate}
+                    ${isCard ? `<br>回饋: ${r.rewardDesc}，約 $${Math.round(r.rewardAmount).toLocaleString()} TWD` : ''}
+                    ${isCard ? `<br>手續費: 1.5%，約 $${Math.round(r.feeTwd).toLocaleString()} TWD` : ''}
+                    ${isCard ? `<br><span class="${r.saved >= 0 ? 'better' : 'worse'}">${r.saved >= 0 ? '比現金省約 $' + Math.round(r.saved).toLocaleString() : '比現金多花約 $' + Math.round(Math.abs(r.saved)).toLocaleString()}</span>` : ''}
+                    ${r.createdByEmail ? `<br><span class="muted">建立者：${r.createdByEmail}</span>` : ''}
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    window.addOrUpdateRecord = async function () {
+        if (!currentUser) {
+            alert('請先登入 Google 帳號');
+            return;
+        }
+        if (!currentBookId) {
+            alert('請先建立或加入帳本');
+            return;
+        }
+        if (!tempCalc) return;
+
+        try {
+            if (editingId) {
+                const recordRef = doc(db, 'books', currentBookId, 'records', editingId);
+                await updateDoc(recordRef, {
+                    ...tempCalc,
+                    updatedBy: currentUser.uid,
+                    updatedByEmail: currentUser.email,
+                    updatedAt: serverTimestamp()
+                });
+                editingId = null;
+                document.getElementById('mainBtn').innerText = '分析此筆交易';
+            } else {
+                await addDoc(collection(db, 'books', currentBookId, 'records'), {
+                    ...tempCalc,
+                    createdBy: currentUser.uid,
+                    createdByEmail: currentUser.email,
+                    createdAt: serverTimestamp()
+                });
+            }
+            resetForm();
+        } catch (error) {
+            console.error(error);
+            alert('儲存紀錄失敗：' + error.message);
+        }
+    };
+
+    window.editRecord = function (id) {
+        const r = records.find(rec => rec.id === id);
+        if (!r) return;
+        editingId = id;
+        window.setType(r.type || 'card');
+        document.getElementById('itemName').value = r.name;
+        document.getElementById('jpyPrice').value = r.jpy;
+        if(r.type === 'card') document.getElementById('cardRate').value = r.cardRate;
+        document.getElementById('mainBtn').innerText = '🔄 重新分析修改內容';
+        hideAnalysis();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.deleteRecord = async function (id) {
+        if (!currentUser || !currentBookId) {
+            alert('請先登入並選擇帳本');
+            return;
+        }
+        if (!confirm('確定刪除？')) return;
+
+        try {
+            await deleteDoc(doc(db, 'books', currentBookId, 'records', id));
+        } catch (error) {
+            console.error(error);
+            alert('刪除失敗：' + error.message);
+        }
+    };
+
+    window.resetForm = function () {
+        document.getElementById('jpyPrice').value = '';
+        document.getElementById('itemName').value = '';
+        document.getElementById('helperTwd').value = '';
+        document.getElementById('helperBox').style.display = 'none';
+        hideAnalysis();
+    };
+
+    function resetForm() {
+        window.resetForm();
+    }
+
+    window.clearAll = async function () {
+        if (!currentUser || !currentBookId) {
+            alert('請先登入並選擇帳本');
+            return;
+        }
+        if (!confirm('清空目前帳本所有紀錄？')) return;
+
+        try {
+            const recordsRef = collection(db, 'books', currentBookId, 'records');
+            const snapshot = await getDocs(recordsRef);
+            const deletes = snapshot.docs.map(docSnap => deleteDoc(doc(db, 'books', currentBookId, 'records', docSnap.id)));
+            await Promise.all(deletes);
+        } catch (error) {
+            console.error(error);
+            alert('清空失敗：' + error.message);
+        }
+    };
+</script>
+</body>
+</html>
